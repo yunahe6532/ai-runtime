@@ -150,6 +150,11 @@ class SessionState:
     handoff: dict[str, Any] = field(default_factory=dict)
     evidence_anchors: list[dict[str, Any]] = field(default_factory=list)
     last_working_set: dict[str, Any] = field(default_factory=dict)
+    planner_runtime_state: dict[str, Any] = field(default_factory=dict)
+    planner_runtime_state_raw: dict[str, Any] = field(default_factory=dict)
+    planner_runtime_state_prompt: str = ""
+    last_planner_shadow: dict[str, Any] = field(default_factory=dict)
+    last_planner_llm_shadow: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

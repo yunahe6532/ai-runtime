@@ -71,6 +71,22 @@ def append_journal(state: Any, entry: JournalEntry | dict[str, Any]) -> None:
         )
     journal.append(entry.to_dict())
     state.task_journal = prune_journal(journal)
+    try:
+        from explorer_trace import write_explorer_trace
+
+        write_explorer_trace(
+            "memory.journal.appended",
+            phase=getattr(state, "phase_hint", "") or "",
+            query=str(getattr(state, "current_query", "") or "")[:500],
+            turn_index=int(getattr(state, "turn_index", 0) or 0),
+            target=entry.target,
+            tool_name=entry.kind,
+            kind=entry.kind,
+            result_summary=entry.summary[:300],
+            reason=entry.why[:200],
+        )
+    except Exception:
+        pass
 
 
 def record_read(

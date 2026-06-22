@@ -1,8 +1,56 @@
 # Handoff
 
-> **Product**: Context Runtime v1 · [VISION.md](./docs/VISION.md)
+> **Product**: AI Runtime — Memory & Task Operating System · [VISION.md](./docs/VISION.md)
 
-## 2026-06-18 — read_only stub 제거 · VISION closed loop 정렬
+## 2026-06-22 — Phase 2.1 LLM Planner Shadow
+
+### 변경 파일
+- `router/agent_brain/llm_planner.py` (신규)
+- `router/agent_brain/planner_shadow.py` — `compare_triple_decisions`, LLM shadow hook
+- `router/explorer_trace.py` — `EXPLORER_TRACE_PATH` env 우선, `planner.llm.proposed` / `planner.triple_compared`
+- `router/runtime_inspector.py` — Rule / Heuristic / LLM 3자 비교
+- `router/runtime_turn_log.py` — `planner_llm_shadow`
+- `router/legacy/memory_store.py` — `last_planner_llm_shadow`
+- `scripts/test-llm-planner-shadow-e2e.py` (신규)
+- `docs/REFACTOR.md`
+
+### 완료
+- LLM 기반 `PlannerDecision` shadow (`propose_llm_shadow_decision`) — hot path 미변경
+- rule / heuristic / LLM 3자 비교 (action_match, target/evidence overlap, confidence_delta, risk_flags, would_change_hot_path)
+- trace: `planner.llm.proposed`, `planner.triple_compared`
+- 실패 시 recover/ask_user fallback — hot path 영향 없음
+
+### env (default off)
+- `LLM_PLANNER_SHADOW_ENABLED=0`
+- `LLM_PLANNER_TIMEOUT_SEC=15`
+- `LLM_PLANNER_MAX_TOKENS=512`
+
+### 검증
+- `test-llm-planner-shadow-e2e.py` 7/7 PASS
+- `test-planner-runtime-state-e2e.py` 7/7 PASS
+- `test-explorer-trace-e2e.py` 6/6 PASS
+- `benchmark-recovery-e2e.py` PASS
+- `test-ping-pong-gate.py` PASS
+- `benchmark-runtime-score.py --tasks 30` **30/30**
+
+### 다음 작업
+- **Phase 2.2**: `read/grep/glob`만 부분 승격, `edit/shell/final`은 hard guard 유지
+- live shadow: `LLM_PLANNER_SHADOW_ENABLED=1 docker compose up -d router`
+
+---
+
+
+### 변경
+- OS/GPU Runtime 표현 약화 → Runtime Middleware · Prompt Residency Policy
+- §1 문제 정의: Local LLM + Agent IDE Runtime 격차
+- Implemented / In Progress / Planned 전역 표기
+- §7 기존 기술 한계 (LiteLLM · LlamaIndex · LangGraph · Cursor)
+- Roadmap v1–v4 현실화 · Build vs Buy 명확화
+
+### 검증
+- 문서만 변경 (코드 무관)
+
+---
 
 ### 증상
 - read_only 구조 질문이 `"요청하신 검증 결과를 artifact 분석 기준으로… (차단된 Read 대신 Shell 검증)"` 로 끝남

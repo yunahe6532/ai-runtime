@@ -83,6 +83,39 @@ def record_runtime_turn(
 
     if state is not None:
         state.last_runtime_turn = turn
+        shadow = dict(getattr(state, "last_planner_shadow", None) or {})
+        if shadow:
+            turn["planner_shadow_decision"] = shadow
+            turn["planner_observability"] = {
+                "match": shadow.get("match"),
+                "mismatch_reason": shadow.get("mismatch_reason"),
+                "would_change_hot_path": shadow.get("would_change_hot_path"),
+                "target_overlap": shadow.get("target_overlap"),
+                "evidence_overlap": shadow.get("evidence_overlap"),
+                "confidence_delta": shadow.get("confidence_delta"),
+                "rule_action": (shadow.get("comparison") or {}).get("rule_action"),
+                "heuristic_action": (shadow.get("comparison") or {}).get("shadow_action"),
+            }
+            llm_shadow = dict(getattr(state, "last_planner_llm_shadow", None) or {})
+            if not llm_shadow and shadow.get("llm_shadow_decision"):
+                llm_shadow = {
+                    "decision": shadow.get("llm_shadow_decision"),
+                    "meta": shadow.get("llm_shadow_meta"),
+                    "triple_comparison": shadow.get("triple_comparison"),
+                }
+            if llm_shadow:
+                turn["planner_llm_shadow"] = llm_shadow
+                triple = dict(llm_shadow.get("triple_comparison") or shadow.get("triple_comparison") or {})
+                turn["planner_observability"].update({
+                    "llm_action": triple.get("llm_action") or (llm_shadow.get("decision") or {}).get("action"),
+                    "llm_status": (llm_shadow.get("meta") or shadow.get("llm_shadow_meta") or {}).get("status"),
+                    "action_match_rule_llm": triple.get("action_match_rule_llm"),
+                    "triple_would_change_hot_path": triple.get("would_change_hot_path"),
+                })
+        fr = dict(getattr(state, "last_runtime_turn", None) or {})
+        if fr.get("final_report_used") is not None:
+            turn["final_report_used"] = fr.get("final_report_used")
+            turn["final_report_chars"] = fr.get("final_report_chars")
         metrics = dict(getattr(state, "last_ingest_metrics", None) or {})
         metrics.update({
             "coverage_score": turn["coverage_score"],

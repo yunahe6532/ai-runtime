@@ -179,6 +179,22 @@ def build_context_for_turn(
         need, state, backend=backend, phase=phase, max_output=max_out, project_index=project_index,
     )
     state.last_working_set = ws.to_dict()
+    try:
+        from explorer_trace import write_explorer_trace
+
+        write_explorer_trace(
+            "working_set.created",
+            phase=phase,
+            query=query[:500],
+            turn_index=int(getattr(state, "turn_index", 0) or 0),
+            result_summary=(
+                f"targets={len(ws.priority_targets)} must={len(ws.must_include)} "
+                f"retrieved_cap={ws.retrieved_token_cap}"
+            ),
+            priority_targets=ws.priority_targets[:12],
+        )
+    except Exception:
+        pass
 
     pre_budget = allocate_static(backend, phase, max_out)
     retrieval_budget = max(ws.retrieved_token_cap, pre_budget.retrieved)
@@ -255,6 +271,22 @@ def build_context_for_turn(
         coverage_hits=list(ap.get("coverage_hits") or []),
     )
     pack.coverage = coverage
+    try:
+        from explorer_trace import write_explorer_trace
+
+        write_explorer_trace(
+            "coverage.checked",
+            phase=phase,
+            query=query[:500],
+            turn_index=int(getattr(state, "turn_index", 0) or 0),
+            result_summary=(
+                f"score={float(getattr(coverage, 'coverage_score', 0) or 0):.2f} "
+                f"complete={bool(getattr(coverage, 'complete', False))}"
+            ),
+            missing=list(getattr(coverage, "missing", None) or [])[:8],
+        )
+    except Exception:
+        pass
     emit_runtime_event(
         event_coverage_checked(
             coverage_score=float(getattr(coverage, "coverage_score", 0) or 0),
@@ -374,6 +406,24 @@ def build_context_for_turn(
     )
     if phase in ("final_answer", "partial_final_answer", "recovery_final"):
         build_handoff(state, query=query)
+
+    try:
+        from agent_brain.planner_shadow import run_planner_shadow_if_enabled
+
+        run_planner_shadow_if_enabled(
+            state,
+            query=query,
+            phase=phase,
+            router_intent=intent_name,
+            context_intent=getattr(need, "intent", "") or intent_name,
+            project_index=project_index,
+            working_set=ws,
+            budget_plan=budget,
+            coverage=coverage,
+            context_need=need,
+        )
+    except Exception as exc:
+        LOG.warning("planner_shadow hook failed: %s", exc)
 
     LOG.info(
         "turn_summary phase=%s intent=%s coverage=%.2f complete=%s ws_targets=%d pack_tokens=%d",

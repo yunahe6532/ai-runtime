@@ -291,4 +291,22 @@ def ingest_artifacts_evidence(
 
     if count:
         LOG.info("evidence_ingest anchors=%d journal_len=%d", count, len(getattr(state, "task_journal", None) or []))
+    try:
+        from explorer_trace import write_explorer_trace
+
+        turn_index = int(getattr(state, "turn_index", 0) or 0)
+        for art in artifacts:
+            if art.type not in ("file_read", "shell_result", "tool_result", "tool_call"):
+                continue
+            write_explorer_trace(
+                "memory.evidence.upserted",
+                phase=getattr(state, "phase_hint", "") or "",
+                query=query[:500],
+                turn_index=turn_index,
+                path=art.path or art.name or art.type,
+                tool_name=art.name or art.type,
+                result_summary=(art.summary or art.prompt_excerpt or "")[:300],
+            )
+    except Exception:
+        pass
     return count

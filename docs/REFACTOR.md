@@ -1,6 +1,6 @@
 # AI Runtime — Refactor Plan (Local LLM Runtime)
 
-> **상태**: Phase 1.8 — Evidence/Journal/Report 검증 (2026-06-22)  
+> **상태**: Phase 2.1 — LLM Planner Shadow (2026-06-22)  
 > **철학**: [VISION.md](./VISION.md) — Context 압축기 ❌ · Local LLM Runtime ✅
 
 ---
@@ -82,6 +82,63 @@ Phase 2 착수 조건:
 
 ## Phase 2 — AI Planner (next)
 
+### Phase 2.0 — RuntimeState Contract ✅ (2026-06-22)
+
+| 모듈 | 역할 |
+|------|------|
+| `agent_brain/runtime_state.py` | Planner `RuntimeState` + `RuntimeStateBuilder` |
+| `agent_brain/planner_contract.py` | `PlannerDecision` schema (read/grep/…/final) |
+| `agent_brain/planner_shadow.py` | Shadow mode — compare rule vs candidate, no hot path |
+
+Shadow hook: `dynamic_context_scheduler.build_context_for_turn`  
+env: `PLANNER_SHADOW_MODE=1` (default on), `MAX_RUNTIME_STATE_PROMPT_CHARS=8000`
+
+Phase 2.1 ✅: LLM planner shadow — `agent_brain/llm_planner.py`, 3-way compare
+
+Phase 2.2 (next): read/grep/glob 부분 승격 (edit/shell/final은 hard guard 유지)
+
+---
+
+### Phase 2.1 — LLM Planner Shadow ✅ (2026-06-22)
+
+| 모듈 | 역할 |
+|------|------|
+| `agent_brain/llm_planner.py` | `propose_llm_shadow_decision()` — RuntimeState JSON → PlannerDecision |
+| `planner_shadow.py` | rule / heuristic / LLM `compare_triple_decisions()` |
+
+env (`LLM_PLANNER_SHADOW_ENABLED=0` default — shadow only):
+
+| 변수 | default |
+|------|---------|
+| `LLM_PLANNER_SHADOW_ENABLED` | `0` |
+| `LLM_PLANNER_TIMEOUT_SEC` | `15` |
+| `LLM_PLANNER_MAX_TOKENS` | `512` |
+
+trace: `planner.llm.proposed`, `planner.triple_compared`
+
+```bash
+python3 scripts/test-llm-planner-shadow-e2e.py
+```
+
+---
+
+### Phase 2.05 — Planner/Explorer Trace Observability ✅ (2026-06-22)
+
+| 항목 | 내용 |
+|------|------|
+| SSOT | `write_explorer_trace()` — common schema + flush |
+| Host path | `tmp/cursor-captures/explorer-trace.ndjson` (docker `/captures/`) |
+| CLI | `tail-explorer-flow.py --from-start` (replay+exit), `--diagnose` |
+| Events | `planner.*`, `memory.*`, `working_set.*`, `coverage.*`, `final_report.*` |
+| Shadow | `would_change_hot_path`, `target_overlap`, `confidence_delta` |
+
+```bash
+python3 scripts/test-explorer-trace-e2e.py
+python3 scripts/tail-explorer-flow.py tmp/cursor-captures/explorer-trace.ndjson --from-start
+```
+
+---
+
 ```text
 RuntimeState + Self Model + Journal tail
     → LLM PlannerDecision (retrieve_more | call_tool | summarize | final)
@@ -115,6 +172,9 @@ LLM optional polish only
 ## 검증
 
 ```bash
+python3 scripts/test-planner-runtime-state-e2e.py
+python3 scripts/test-llm-planner-shadow-e2e.py
+python3 scripts/test-explorer-trace-e2e.py
 python3 scripts/test-evidence-journal-report-e2e.py
 python3 scripts/benchmark-recovery-e2e.py
 ./scripts/verify-router.sh

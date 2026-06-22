@@ -344,6 +344,74 @@ def _build_memory_snapshot(ap: dict[str, Any], state: Any | None) -> list[str]:
     return lines
 
 
+def _build_planner_runtime_section(state: Any | None) -> list[str]:
+    if state is None:
+        return []
+    prs = dict(getattr(state, "planner_runtime_state", None) or {})
+    shadow = dict(getattr(state, "last_planner_shadow", None) or {})
+    if not prs and not shadow:
+        return []
+
+    lines = ["Planner RuntimeState", ""]
+    if prs:
+        lines.append(f"  phase: {prs.get('phase', '?')}")
+        lines.append(f"  router_intent: {prs.get('router_intent', '')}")
+        lines.append(f"  journal_tail: {len(prs.get('task_journal_tail') or [])}")
+        lines.append(f"  anchors: {len(prs.get('evidence_anchor_summary') or [])}")
+        prompt = str(getattr(state, "planner_runtime_state_prompt", "") or "")
+        if prompt:
+            lines.append(f"  prompt_chars: {len(prompt)}")
+        ws = prs.get("working_set_summary") or {}
+        targets = list(ws.get("priority_targets") or [])[:4]
+        if targets:
+            lines.append("  ws_targets: " + ", ".join(str(t) for t in targets))
+
+    if shadow:
+        cmp_ = dict(shadow.get("comparison") or {})
+        triple = dict(shadow.get("triple_comparison") or getattr(state, "last_planner_llm_shadow", None) or {})
+        if isinstance(triple, dict) and triple.get("triple_comparison"):
+            triple = dict(triple.get("triple_comparison") or triple)
+        lines.append("")
+        lines.append("Shadow Decision (rule vs heuristic)")
+        lines.append(f"  match: {shadow.get('match', cmp_.get('match'))}")
+        lines.append(
+            f"  rule: {cmp_.get('rule_action', '?')} → heuristic: {cmp_.get('shadow_action', '?')}"
+        )
+        mismatch = shadow.get("mismatch_reason") or cmp_.get("mismatch_reason") or ""
+        if mismatch:
+            lines.append(f"  mismatch: {mismatch}")
+        llm_dec = shadow.get("llm_shadow_decision") or {}
+        llm_meta = shadow.get("llm_shadow_meta") or {}
+        if llm_dec or triple:
+            lines.append("")
+            lines.append("Triple Compare (rule / heuristic / LLM)")
+            lines.append(
+                f"  rule={triple.get('rule_action', cmp_.get('rule_action', '?'))} "
+                f"heuristic={triple.get('heuristic_action', cmp_.get('shadow_action', '?'))} "
+                f"llm={triple.get('llm_action', llm_dec.get('action', 'n/a'))}"
+            )
+            if llm_meta.get("status"):
+                lines.append(f"  llm_status: {llm_meta.get('status')}")
+            if triple.get("action_match_rule_llm") is not None:
+                lines.append(f"  action_match(rule↔llm): {triple.get('action_match_rule_llm')}")
+            if triple.get("target_overlap_rule_llm") is not None:
+                lines.append(f"  target_overlap(rule↔llm): {triple.get('target_overlap_rule_llm')}")
+        if shadow.get("would_change_hot_path") or triple.get("would_change_hot_path"):
+            lines.append("  would_change_hot_path: true")
+        if shadow.get("target_overlap") is not None:
+            lines.append(f"  target_overlap(rule↔heuristic): {shadow.get('target_overlap')}")
+    trace_path = ""
+    try:
+        from explorer_trace import default_trace_path
+
+        trace_path = str(default_trace_path())
+    except ImportError:
+        pass
+    if trace_path:
+        lines.append(f"  trace: {trace_path}")
+    return lines
+
+
 def _build_budget_section(ctx: RuntimeInspectorContext) -> list[str]:
     rt = ctx.runtime_turn or {}
     budget = dict(rt.get("budget_plan") or {})
@@ -602,6 +670,7 @@ def build_runtime_inspector(ctx: RuntimeInspectorContext) -> str:
         _details_block("Context", "\n".join(_build_context_section(ctx))),
         _details_block("Memory Hierarchy", "\n".join(_build_memory_hierarchy_section(ctx))),
         _details_block("Memory", "\n".join(_build_memory_snapshot(ap, ctx.session_state))),
+        _details_block("Planner RuntimeState", "\n".join(_build_planner_runtime_section(ctx.session_state))),
         _details_block("Dashboard", _dashboard_bars(phase)),
     ]
 

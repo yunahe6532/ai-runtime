@@ -6,6 +6,9 @@ echo "=== verify-router.sh ==="
 python3 scripts/benchmark-read-only-analysis-regression.py
 python3 scripts/test-resolve-agent-phase-smoke.py
 python3 scripts/test-evidence-judge.py
+python3 scripts/test-planner-runtime-state-e2e.py
+python3 scripts/test-explorer-trace-e2e.py
+python3 scripts/test-llm-planner-shadow-e2e.py
 python3 scripts/test-evidence-journal-report-e2e.py
 python3 scripts/test-runtime-inspector.py
 python3 scripts/test-agent-exec.py

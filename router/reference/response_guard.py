@@ -270,6 +270,21 @@ def _mark_final_report_used(
         reason or "n/a",
         chars,
     )
+    try:
+        from explorer_trace import write_explorer_trace
+
+        write_explorer_trace(
+            "final_report.rendered",
+            phase=str(getattr(session_state, "phase_hint", "") or ""),
+            query=str(getattr(session_state, "current_query", "") or "")[:500],
+            turn_index=int(getattr(session_state, "turn_index", 0) or 0),
+            decision="final_report" if used else "fallback",
+            result_summary=f"used={used} chars={chars} reason={reason}",
+            final_report_used=used,
+            final_report_chars=chars,
+        )
+    except Exception:
+        pass
 
 
 def build_partial_final_prose(
