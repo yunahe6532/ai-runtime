@@ -163,6 +163,30 @@ def build_context_for_turn(
             LOG.warning("project_index bootstrap skipped: %s", exc)
 
     agent_plan = ensure_agent_plan(state, query)
+    state.agent_plan = agent_plan.to_dict()
+
+    try:
+        from agent_brain.planner_shadow import run_planner_shadow_if_enabled
+        from agent_brain.promotion_gate import (
+            apply_planner_promotion_if_allowed,
+            reset_planner_promotion_turn,
+        )
+        from reference.planner import AgentPlan
+
+        reset_planner_promotion_turn(state)
+        run_planner_shadow_if_enabled(
+            state,
+            query=query,
+            phase=phase,
+            router_intent=intent_name,
+            context_intent=intent_name,
+            project_index=project_index,
+        )
+        apply_planner_promotion_if_allowed(state, phase=phase)
+        agent_plan = AgentPlan.from_dict(state.agent_plan)
+    except Exception as exc:
+        LOG.warning("planner promotion hook failed: %s", exc)
+
     need = extract_context_need(agent_plan, query, intent_name, phase)
     agent_plan.context_need = need.to_dict()
     state.agent_plan = agent_plan.to_dict()
@@ -406,24 +430,6 @@ def build_context_for_turn(
     )
     if phase in ("final_answer", "partial_final_answer", "recovery_final"):
         build_handoff(state, query=query)
-
-    try:
-        from agent_brain.planner_shadow import run_planner_shadow_if_enabled
-
-        run_planner_shadow_if_enabled(
-            state,
-            query=query,
-            phase=phase,
-            router_intent=intent_name,
-            context_intent=getattr(need, "intent", "") or intent_name,
-            project_index=project_index,
-            working_set=ws,
-            budget_plan=budget,
-            coverage=coverage,
-            context_need=need,
-        )
-    except Exception as exc:
-        LOG.warning("planner_shadow hook failed: %s", exc)
 
     LOG.info(
         "turn_summary phase=%s intent=%s coverage=%.2f complete=%s ws_targets=%d pack_tokens=%d",

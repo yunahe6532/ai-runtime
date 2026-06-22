@@ -2,6 +2,35 @@
 
 > **Product**: AI Runtime — Memory & Task Operating System · [VISION.md](./docs/VISION.md)
 
+## 2026-06-22 — Planner Partial Promotion (Phase 2.2b)
+
+### 구현
+- `promotion_gate.py` — `should_apply_promotion`, `apply_planner_promotion_if_allowed`, kill switch env
+- `read/grep/glob` only → `ReadSource` / `GrepSource` / `GlobSource` next_action 대체
+- `edit/shell/final/summarize/recover/ask_user` 승격 금지
+- `dynamic_context_scheduler` — shadow+apply를 pack 빌드 **전**으로 이동
+- Observability: `planner.promotion.applied|skipped|blocked`, turn_log, inspector
+
+### Env (default = 기존 hot path 동일)
+| Env | Default |
+|-----|---------|
+| `PLANNER_PROMOTION_SHADOW_ONLY` | `1` |
+| `PLANNER_PROMOTION_ENABLE_READONLY` | `0` |
+| `PLANNER_PROMOTION_MAX_PER_TURN` | `1` |
+
+승격 켜기: `PLANNER_PROMOTION_SHADOW_ONLY=0` + `PLANNER_PROMOTION_ENABLE_READONLY=1`
+
+### 검증
+- `test-planner-promotion-apply-e2e.py` PASS
+- 기존 gate/shadow/trace 회귀 PASS
+- benchmark default 29–30/30, promotion-on **30/30**
+- `shell_logs` flaky → `docs/reports/benchmark-known-flaky.md` (승격 실패로 오판 금지)
+
+### 다음
+- Phase 2.2c+ (optional): promotion metrics dashboard, broader intent tuning
+
+---
+
 ## 2026-06-22 — Deprecated Env & Legacy Archive (Phase 2.2a-clean3)
 
 ### 완료

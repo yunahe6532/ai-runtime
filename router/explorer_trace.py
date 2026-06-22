@@ -336,10 +336,23 @@ def format_flow_event(row: dict[str, Any]) -> str | None:
         "planner.promotion.evaluated",
         "planner.promotion.blocked",
         "planner.promotion.eligible",
+        "planner.promotion.applied",
+        "planner.promotion.skipped",
     ):
         eligible = row.get("eligible")
-        label = "eligible" if event.endswith("eligible") else ("blocked" if event.endswith("blocked") else "evaluated")
-        action = str(row.get("allowed_action") or "none")
+        applied = row.get("applied")
+        label = (
+            "applied"
+            if event.endswith("applied")
+            else "skipped"
+            if event.endswith("skipped")
+            else "eligible"
+            if event.endswith("eligible")
+            else "blocked"
+            if event.endswith("blocked")
+            else "evaluated"
+        )
+        action = str(row.get("allowed_action") or row.get("effective_action") or "none")
         lines.append(f"[{ts}] promotion {label} · {action}{phase_s}{fid}")
         reason = str(row.get("reason") or "").strip()
         if reason:
@@ -347,9 +360,15 @@ def format_flow_event(row: dict[str, Any]) -> str | None:
         blocked = row.get("blocked_reasons")
         if blocked:
             lines.append(f"  blocked: {blocked}")
+        if row.get("target"):
+            lines.append(f"  target: {row.get('target')}")
+        if row.get("original_rule_action"):
+            orig = row.get("original_rule_action") or {}
+            if isinstance(orig, dict) and orig.get("tool"):
+                lines.append(f"  original_rule: {orig.get('tool')} {orig.get('target', '')}")
         if row.get("would_change_hot_path"):
             lines.append("  ⚠ would_change_hot_path=true")
-        dry = row.get("dry_run_tool_call") or {}
+        dry = row.get("dry_run_tool_call") or row.get("promotion_decision", {}).get("dry_run_tool_call") or {}
         fn = (dry.get("function") or {}) if isinstance(dry, dict) else {}
         if fn.get("name"):
             lines.append(f"  dry_run: {fn.get('name')}")

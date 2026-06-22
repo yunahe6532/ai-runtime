@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -406,12 +407,31 @@ def _build_planner_runtime_section(state: Any | None) -> list[str]:
             or {}
         )
         if promo:
+            rt_applied = bool((getattr(state, "last_runtime_turn", None) or {}).get("planner_promotion_applied"))
             lines.append("")
-            lines.append("Promotion Gate (shadow-only)")
+            lines.append("Promotion Gate")
+            lines.append(f"  Promotion Applied: {'yes' if rt_applied else 'no'}")
             lines.append(f"  eligible: {promo.get('eligible')}")
             lines.append(f"  allowed_action: {promo.get('allowed_action', 'none')}")
-            if promo.get("reason"):
-                lines.append(f"  reason: {str(promo.get('reason'))[:120]}")
+            if promo.get("effective_action"):
+                lines.append(f"  Effective Action: {promo.get('effective_action')}")
+            orig = promo.get("effective_tool_call", {}).get("original_rule_action") or promo.get("original_rule_action")
+            if isinstance(orig, dict) and orig.get("tool"):
+                lines.append(f"  Original Rule Action: {orig.get('tool')} {orig.get('target', '')}")
+            if promo.get("apply_reason"):
+                lines.append(f"  Reason: {str(promo.get('apply_reason') or promo.get('reason'))[:120]}")
+            if promo.get("confidence") is not None:
+                lines.append(f"  Confidence: {promo.get('confidence')}")
+            eff = promo.get("effective_tool_call") or {}
+            fn = (eff.get("function") or {}) if isinstance(eff, dict) else {}
+            if fn.get("arguments"):
+                try:
+                    args = json.loads(fn.get("arguments") or "{}")
+                    target = args.get("source_id") or args.get("path")
+                    if target:
+                        lines.append(f"  Target: {target}")
+                except json.JSONDecodeError:
+                    pass
             blocked = list(promo.get("blocked_reasons") or [])
             if blocked:
                 lines.append(f"  blocked: {', '.join(blocked[:3])}")

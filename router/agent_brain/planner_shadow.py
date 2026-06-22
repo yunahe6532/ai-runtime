@@ -293,12 +293,17 @@ def run_planner_shadow(
 
     promotion_decision: dict[str, Any] | None = None
     try:
-        from .promotion_gate import evaluate_promotion, promotion_gate_enabled
+        from .promotion_gate import evaluate_promotion, promotion_gate_enabled, build_effective_planner_action
 
         if promotion_gate_enabled() and llm_decision is not None:
-            promo = evaluate_promotion(rule, heuristic, llm_decision, brain_state, phase=phase)
+            promo = evaluate_promotion(
+                rule, heuristic, llm_decision, brain_state, phase=phase, session_state=session_state,
+            )
             promotion_decision = promo.to_dict()
             session_state.last_planner_promotion = promotion_decision
+            if promo.apply_allowed:
+                effective = build_effective_planner_action(llm_decision, rule, promo)
+                session_state.last_effective_planner_action = effective.to_dict()
     except Exception as exc:
         LOG.warning("promotion gate failed: %s", exc)
         promotion_decision = {"eligible": False, "reason": f"error:{exc}", "blocked_reasons": ["error"]}
@@ -321,6 +326,10 @@ def run_planner_shadow(
         "triple_comparison": triple_comparison,
         "promotion_decision": promotion_decision,
     }
+
+    effective_planner_action = getattr(session_state, "last_effective_planner_action", None)
+    if effective_planner_action:
+        payload["effective_planner_action"] = effective_planner_action
 
     if triple_comparison:
         payload["would_change_hot_path"] = triple_comparison.get("would_change_hot_path")

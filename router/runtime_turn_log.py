@@ -125,6 +125,20 @@ def record_runtime_turn(
                     "promotion_allowed_action": promo.get("allowed_action"),
                     "promotion_blocked_reasons": promo.get("blocked_reasons"),
                     "promotion_would_change_hot_path": promo.get("would_change_hot_path"),
+                    "promotion_apply_allowed": promo.get("apply_allowed"),
+                    "promotion_apply_reason": promo.get("apply_reason"),
+                })
+            rt_promo = dict(getattr(state, "last_runtime_turn", None) or {})
+            if rt_promo.get("planner_promotion_applied"):
+                turn["planner_promotion_applied"] = True
+                turn["effective_action"] = rt_promo.get("effective_action")
+                turn["original_rule_action"] = rt_promo.get("original_rule_action")
+                turn["promotion_source"] = rt_promo.get("promotion_source")
+                turn["planner_observability"].update({
+                    "planner_promotion_applied": True,
+                    "effective_action": rt_promo.get("effective_action"),
+                    "original_rule_action": rt_promo.get("original_rule_action"),
+                    "promotion_source": rt_promo.get("promotion_source"),
                 })
         fr = dict(getattr(state, "last_runtime_turn", None) or {})
         if fr.get("final_report_used") is not None:

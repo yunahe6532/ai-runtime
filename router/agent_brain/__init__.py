@@ -21,12 +21,19 @@ from .planner_shadow import (
 )
 from .promotion_gate import (
     PromotionDecision,
+    apply_planner_promotion_if_allowed,
+    build_effective_planner_action,
     evaluate_promotion,
+    promotion_enable_readonly,
     promotion_gate_enabled,
+    promotion_max_per_turn,
     promotion_metrics_snapshot,
     promotion_min_confidence,
     promotion_shadow_only,
+    promotion_to_next_action,
+    reset_planner_promotion_turn,
     reset_promotion_metrics,
+    should_apply_promotion,
 )
 from .runtime_state import (
     MAX_RUNTIME_STATE_ANCHOR_ITEMS,
@@ -65,9 +72,16 @@ __all__ = [
     "compare_triple_decisions",
     "PromotionDecision",
     "evaluate_promotion",
+    "should_apply_promotion",
+    "apply_planner_promotion_if_allowed",
+    "build_effective_planner_action",
+    "promotion_to_next_action",
     "promotion_gate_enabled",
     "promotion_shadow_only",
+    "promotion_enable_readonly",
+    "promotion_max_per_turn",
     "promotion_min_confidence",
     "promotion_metrics_snapshot",
     "reset_promotion_metrics",
+    "reset_planner_promotion_turn",
 ]

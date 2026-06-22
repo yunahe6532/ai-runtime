@@ -231,17 +231,17 @@ def test_explorer_trace_promotion_events(tmp: Path) -> None:
     state = SessionState()
     state.current_query = "q"
     state.agent_plan = {
-        "next_action": {"tool": "Read", "target": "a.py", "reason": "r"},
+        "next_action": {"tool": "Read", "target": "router/main.py", "reason": "r"},
         "evidence_needed": [],
         "evidence_collected": [],
     }
-    state.project_index = {"entrypoints": ["a.py"]}
-    state.last_working_set = {"priority_targets": ["a.py"]}
+    state.project_index = {"entrypoints": ["router/main.py"]}
+    state.last_working_set = {"priority_targets": ["router/main.py"]}
 
     with mock.patch(
         "agent_brain.llm_planner._invoke_llm",
         return_value=(
-            json.dumps({"action": "read", "target_files": ["a.py"], "reason": "ok", "confidence": 0.9}),
+            json.dumps({"action": "read", "target_files": ["router/main.py"], "reason": "ok", "confidence": 0.9}),
             {"status": "ok"},
         ),
     ):
