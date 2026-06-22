@@ -658,6 +658,11 @@ def _emit_apply_trace(
             phase=phase,
             query=str(getattr(session_state, "current_query", "") or "")[:500],
             turn_index=int(getattr(session_state, "turn_index", 0) or 0),
+            router_intent=str(
+                (getattr(session_state, "agent_plan", None) or {}).get("router_intent")
+                or getattr(session_state, "last_intent", "")
+                or ""
+            ),
             applied=result.get("applied"),
             skipped=result.get("skipped"),
             blocked=result.get("blocked"),

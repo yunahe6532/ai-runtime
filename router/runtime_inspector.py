@@ -438,9 +438,16 @@ def _build_planner_runtime_section(state: Any | None) -> list[str]:
             metrics = dict(promo.get("metrics") or {})
             if metrics.get("eligible_rate") is not None:
                 lines.append(
-                    f"  metrics: eligible_rate={metrics.get('eligible_rate')} "
-                    f"would_change_rate={metrics.get('would_change_hot_path_rate')}"
+                    f"  rates: eligible={metrics.get('eligible_rate')} "
+                    f"applied={metrics.get('applied_rate', 0)} "
+                    f"would_change={metrics.get('would_change_hot_path_rate')}"
                 )
+                if metrics.get("applied") is not None:
+                    lines.append(
+                        f"  counts: evaluations={metrics.get('evaluations')} "
+                        f"eligible={metrics.get('eligible')} applied={metrics.get('applied')} "
+                        f"apply_blocked={metrics.get('apply_blocked', 0)}"
+                    )
             dry = promo.get("dry_run_tool_call") or {}
             if dry.get("function", {}).get("name"):
                 lines.append(f"  dry_run: {dry['function']['name']}")

@@ -1,6 +1,6 @@
 # AI Runtime — Refactor Plan (Local LLM Runtime)
 
-> **상태**: Phase 2.1 — LLM Planner Shadow (2026-06-22)  
+> **상태**: Phase 2.2b — Read-only Planner Promotion (2026-06-22)  
 > **철학**: [VISION.md](./VISION.md) — Context 압축기 ❌ · Local LLM Runtime ✅
 
 ---
@@ -95,7 +95,9 @@ env: `PLANNER_SHADOW_MODE=1` (default on), `MAX_RUNTIME_STATE_PROMPT_CHARS=8000`
 
 Phase 2.1 ✅: LLM planner shadow — `agent_brain/llm_planner.py`, 3-way compare
 
-Phase 2.2 (next): read/grep/glob 실제 hot path 부분 승격
+Phase 2.2b ✅: read/grep/glob hot path 부분 승격 (`PLANNER_PROMOTION_ENABLE_READONLY=1` + kill switch)
+
+Phase 2.2c (next): promotion metrics/tuning — no new action types
 
 ---
 
@@ -140,7 +142,9 @@ python3 scripts/test-planner-promotion-gate-e2e.py
 
 ---
 
-Phase 2.2 (next): read/grep/glob 실제 hot path 부분 승격 (edit/shell/final은 hard guard 유지)
+Phase 2.2b ✅: read/grep/glob hot path 부분 승격 (`PLANNER_PROMOTION_ENABLE_READONLY=1` + kill switch)
+
+Phase 2.2c (next): promotion metrics/tuning — no new action types (edit/shell/final은 hard guard 유지)
 
 ---
 

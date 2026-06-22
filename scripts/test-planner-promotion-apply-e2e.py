@@ -27,6 +27,7 @@ from legacy.memory_store import SessionState  # noqa: E402
 
 
 def _env_on() -> None:
+    os.environ["EXPLORER_TRACE_ENABLED"] = "1"
     os.environ["PLANNER_PROMOTION_GATE_ENABLED"] = "1"
     os.environ["PLANNER_PROMOTION_SHADOW_ONLY"] = "0"
     os.environ["PLANNER_PROMOTION_ENABLE_READONLY"] = "1"

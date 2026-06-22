@@ -27,7 +27,8 @@
 - `shell_logs` flaky → `docs/reports/benchmark-known-flaky.md` (승격 실패로 오판 금지)
 
 ### 다음
-- Phase 2.2c+ (optional): promotion metrics dashboard, broader intent tuning
+- **Phase 2.2c** — metrics/tuning (`audit-planner-promotion-metrics.py` ✅, Inspector rates, intent trace, REFACTOR sync)
+- 실측: `docs/reports/planner-promotion-live-validation.md`
 
 ---
 

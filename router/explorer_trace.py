@@ -18,6 +18,7 @@ EXPLORER_TRACE_FORMAT = os.getenv("EXPLORER_TRACE_FORMAT", "both").strip().lower
 EXPLORER_TRACE_STDOUT = os.getenv("EXPLORER_TRACE_STDOUT", "1") == "1"
 EXPLORER_TRACE_PREVIEW_LINES = int(os.getenv("EXPLORER_TRACE_PREVIEW_LINES", "14"))
 EXPLORER_TRACE_PREVIEW_CHARS = int(os.getenv("EXPLORER_TRACE_PREVIEW_CHARS", "2400"))
+EXPLORER_TRACE_THINKING_MAX_CHARS = int(os.getenv("EXPLORER_TRACE_THINKING_MAX_CHARS", "8000"))
 
 _lock = threading.Lock()
 _boot_logged = False
@@ -203,6 +204,49 @@ def trace_explorer(event: str, **data: Any) -> None:
     write_explorer_trace(event, **data)
 
 
+def extract_message_reasoning(msg: dict[str, Any] | None) -> str:
+    """Pull Qwen/native thinking from an OpenAI-style assistant message."""
+    if not isinstance(msg, dict):
+        return ""
+    for key in ("reasoning_content", "thinking", "reasoning"):
+        val = str(msg.get(key) or "").strip()
+        if val:
+            return val
+    return ""
+
+
+def trace_llm_thinking(
+    thinking: str,
+    *,
+    phase: str = "",
+    query: str = "",
+    turn_index: int = 0,
+    flow_id: str = "",
+    req_id: str = "",
+    tool_calls: int = 0,
+    backend: str = "",
+) -> None:
+    """Record Qwen/native model reasoning in explorer trace for watch-runtime."""
+    text = (thinking or "").strip()
+    if not text:
+        return
+    cap = EXPLORER_TRACE_THINKING_MAX_CHARS
+    clipped = text[:cap]
+    write_explorer_trace(
+        "llm.thinking",
+        phase=phase,
+        query=query[:500],
+        turn_index=turn_index,
+        flow_id=flow_id or req_id,
+        req_id=req_id or flow_id,
+        thinking=clipped,
+        result_summary=clipped[:800],
+        tool_calls_count=int(tool_calls or 0),
+        reasoning_source="qwen",
+        backend=backend,
+    )
+
+
 def diagnose_trace_file(path: Path | str | None = None) -> dict[str, Any]:
     """Inspect trace file health for CLI diagnostics."""
     p = Path(path) if path else _resolve_path()
@@ -290,6 +334,15 @@ def format_flow_event(row: dict[str, Any]) -> str | None:
             lines.extend(_indent_block(summary, prefix="  ", max_lines=8))
         return "\n".join(lines)
 
+    if event == "llm.thinking":
+        lines.append(f"[{ts}] llm thinking (Qwen){phase_s}{fid}")
+        thinking = str(row.get("thinking") or row.get("result_summary") or "").strip()
+        if thinking:
+            lines.append("  thinking")
+            lines.extend(_indent_block(thinking, prefix="    ", max_lines=24))
+        tc = row.get("tool_calls_count")
+        if tc:
+            lines.append(f"  tool_calls: {tc}")
         return "\n".join(lines)
 
     if event == "planner.triple_compared":
@@ -565,6 +618,16 @@ def format_live_summary(row: dict[str, Any]) -> str | None:
             lines.append(f"  {summary}")
         if query:
             lines.append(f"  질문: {query[:120]}")
+        return "\n".join(lines)
+
+    if event == "llm.thinking":
+        header("💭", f"Qwen thinking · {phase or 'llm'}")
+        thinking = str(row.get("thinking") or row.get("result_summary") or "").strip()
+        if thinking:
+            lines.extend(_indent_block(thinking, prefix="  ", max_lines=24))
+        tc = int(row.get("tool_calls_count") or 0)
+        if tc:
+            lines.append(f"  → tool_calls: {tc}")
         return "\n".join(lines)
 
     if event == "plan":
@@ -968,6 +1031,7 @@ FLOW_STAGES: list[tuple[str, tuple[str, ...]]] = [
     (
         "Planner",
         (
+            "llm.thinking",
             "planner.shadow.proposed",
             "planner.shadow.compared",
             "planner.llm.proposed",

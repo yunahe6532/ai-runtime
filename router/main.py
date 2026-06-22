@@ -888,6 +888,23 @@ class ProxyHandler(BaseHTTPRequestHandler):
                             )
                         processed_resp_json = resp_json
                         try:
+                            from explorer_trace import extract_message_reasoning, trace_llm_thinking
+
+                            _trace_msg = resp_json.get("choices", [{}])[0].get("message", {})
+                            _qwen_thinking = extract_message_reasoning(_trace_msg)
+                            if _qwen_thinking:
+                                trace_llm_thinking(
+                                    _qwen_thinking,
+                                    phase=agent_phase or phase or "tool_planning",
+                                    query=query,
+                                    flow_id=flow_id or run_id or "",
+                                    req_id=run_id or flow_id or "",
+                                    tool_calls=len(_trace_msg.get("tool_calls") or []),
+                                    backend=target or "",
+                                )
+                        except Exception as exc:
+                            LOG.debug("llm thinking trace skipped: %s", exc)
+                        try:
                             phase_for_reasoning = agent_phase or (
                                 "final_answer"
                                 if not proxy_body.get("tools")

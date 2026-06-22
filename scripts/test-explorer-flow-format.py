@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "router"))
 
-from explorer_trace import format_flow_event, format_live_summary  # noqa: E402
+from explorer_trace import format_flow_event, format_live_summary, trace_llm_thinking  # noqa: E402
 
 
 def test_plan_shows_thinking_and_next_tool() -> None:
@@ -125,11 +125,28 @@ def test_live_summary_plan_and_tool() -> None:
     assert "def main()" in out2
 
 
+def test_llm_thinking_live_and_verbose() -> None:
+    row = {
+        "ts": "2026-06-22T04:00:00+00:00",
+        "event": "llm.thinking",
+        "phase": "tool_planning",
+        "thinking": "먼저 router/main.py를 읽어 entrypoint를 확인한다.",
+        "tool_calls_count": 1,
+    }
+    live = format_live_summary(row) or ""
+    assert "Qwen thinking" in live
+    assert "router/main.py" in live
+    verbose = format_flow_event(row) or ""
+    assert "llm thinking" in verbose
+    print("llm_thinking_format: OK")
+
+
 def main() -> int:
     test_plan_shows_thinking_and_next_tool()
     test_action_done_shows_result_preview()
     test_alternating_sequence_readable()
     test_live_summary_plan_and_tool()
+    test_llm_thinking_live_and_verbose()
     print("OK: explorer flow format tests passed")
     return 0
 

@@ -44,8 +44,9 @@ RUNTIME_PRIORITY_ORDER = (
 )
 
 RUNTIME_REASONING_POLICY = (
-    "- Do not store or expose private reasoning. "
-    "Store only PlannerDecision, action, reason summary, evidence_needed, confidence, and tool/result summaries."
+    "- Model native reasoning (Qwen thinking) is recorded in explorer trace for live debugging only; "
+    "do not repeat it verbatim in user-facing answers.\n"
+    "- Decision trace stores PlannerDecision summary (action, reason, confidence) — not full chain-of-thought."
 )
 
 FINAL_KOREAN_POLICY = (
