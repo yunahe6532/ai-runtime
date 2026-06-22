@@ -70,8 +70,8 @@ services:
       - "${PORT:-8080}:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - "${CAPTURE_HOST_DIR:-./tmp/cursor-captures}:/captures"
-      - "${CONTEXT_CACHE_HOST_DIR:-./tmp/context-cache}:/context-cache"
+      - "${CAPTURE_HOST_DIR:-${HOME}/.local/share/ai-runtime/captures}:/captures"
+      - "${CONTEXT_CACHE_HOST_DIR:-${HOME}/.local/share/ai-runtime/cache/context-cache}:/context-cache"
     environment:
       AI_RUNTIME_DATA_DIR: "${AI_RUNTIME_DATA_DIR:-}"
       ROUTER_HOST: "0.0.0.0"

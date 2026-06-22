@@ -1,6 +1,6 @@
 # Dead Code Audit
 
-> Generated: 2026-06-22 02:56:38 UTC
+> Generated: 2026-06-22 03:17:29 UTC
 > Entrypoints: 5
 
 ## Summary
@@ -12,7 +12,7 @@
 | active_cli_only | 0 |
 | legacy_fallback | 6 |
 | planned | 0 |
-| dead_candidate | 72 |
+| dead_candidate | 75 |
 | unknown_needs_review | 3 |
 
 ## Dead candidates (sample)
@@ -33,7 +33,9 @@
 | `scripts.analyze-conversation-flow` | `scripts/analyze-conversation-flow.py` | - |
 | `scripts.analyze-cursor-captures` | `scripts/analyze-cursor-captures.py` | - |
 | `scripts.audit-dead-code` | `scripts/audit-dead-code.py` | - |
+| `scripts.audit-foreign-artifacts` | `scripts/audit-foreign-artifacts.py` | - |
 | `scripts.audit-repo-inventory` | `scripts/audit-repo-inventory.py` | - |
+| `scripts.audit-runtime-reachability` | `scripts/audit-runtime-reachability.py` | - |
 | `scripts.benchmark-agent-deadend-regression` | `scripts/benchmark-agent-deadend-regression.py` | - |
 | `scripts.benchmark-cursor-agent` | `scripts/benchmark-cursor-agent.py` | - |
 | `scripts.benchmark-dynamic-budget-matrix` | `scripts/benchmark-dynamic-budget-matrix.py` | - |
@@ -53,12 +55,10 @@
 | `scripts.benchmark-thinking-runtime` | `scripts/benchmark-thinking-runtime.py` | - |
 | `scripts.benchmark-vector-retrieval-e2e` | `scripts/benchmark-vector-retrieval-e2e.py` | - |
 | `scripts.check-architecture-boundary` | `scripts/check-architecture-boundary.py` | - |
+| `scripts.clean-foreign-artifacts` | `scripts/clean-foreign-artifacts.py` | - |
 | `scripts.generate-dependency-graph` | `scripts/generate-dependency-graph.py` | - |
 | `scripts.generate-file-tree` | `scripts/generate-file-tree.py` | - |
 | `scripts.generate-project-structure` | `scripts/generate-project-structure.py` | - |
-| `scripts.replay-capture` | `scripts/replay-capture.py` | - |
-| `scripts.show-flow` | `scripts/show-flow.py` | - |
-| `scripts.tail-explorer-flow` | `scripts/tail-explorer-flow.py` | - |
 
 ## Legacy fallback
 

@@ -1,6 +1,6 @@
 # Project Structure
 
-> Generated: 2026-06-22 02:56:14 UTC
+> Generated: 2026-06-22 03:17:28 UTC
 > Root: `/home/yunahe/ai-runtime/cursor-local-llm`
 
 Source-centric logical tree (vendor, tmp, cache, node_modules excluded).
@@ -28,6 +28,15 @@ cursor-local-llm/
 │   │   ├── dependency-before.mmd
 │   │   └── memory-hierarchy.mmd
 │   ├── reports/
+│   │   ├── archive-candidates.md
+│   │   ├── dead-code-audit.md
+│   │   ├── deprecated-branches.md
+│   │   ├── deprecated-env.md
+│   │   ├── foreign-artifacts-audit.md
+│   │   ├── foreign-artifacts-cleanup.md
+│   │   ├── legacy-archive-plan.md
+│   │   ├── repo-inventory.md
+│   │   └── runtime-reachability.md
 │   ├── ARCHITECTURE.html
 │   ├── ARCHITECTURE.md
 │   ├── BENCHMARK.html
@@ -37,6 +46,7 @@ cursor-local-llm/
 │   ├── INTEGRATIONS.md
 │   ├── MODULE_MAP.html
 │   ├── MODULE_MAP.md
+│   ├── PROJECT_STRUCTURE.md
 │   ├── REFACTOR.md
 │   ├── VISION.html
 │   ├── VISION.md
@@ -153,7 +163,9 @@ cursor-local-llm/
 │   ├── analyze-conversation-flow.py
 │   ├── analyze-cursor-captures.py
 │   ├── audit-dead-code.py
+│   ├── audit-foreign-artifacts.py
 │   ├── audit-repo-inventory.py
+│   ├── audit-runtime-reachability.py
 │   ├── benchmark-agent-deadend-regression.py
 │   ├── benchmark-coder-fast-vs-vl.sh
 │   ├── benchmark-context-grid.sh
@@ -187,6 +199,7 @@ cursor-local-llm/
 │   ├── benchmark.sh
 │   ├── capture-cursor-requests.sh
 │   ├── check-architecture-boundary.py
+│   ├── clean-foreign-artifacts.py
 │   ├── download-coder-model.sh
 │   ├── download-model.sh
 │   ├── download-qwen36-27b.sh
@@ -265,6 +278,8 @@ cursor-local-llm/
 │   ├── tsconfig.json
 │   ├── tsconfig.tsbuildinfo
 │   └── vite.config.ts
+├── .dockerignore
+├── .gitignore
 ├── docker-compose.yml
 ├── handoff.md
 └── README.md
@@ -274,16 +289,13 @@ cursor-local-llm/
 
 | path | reason | files (approx) |
 |------|--------|---------------:|
-| `.dockerignore` | unknown | 1 |
 | `.env` | unknown | 1 |
 | `.env.backup-qwen3.6-27b` | unknown | 1 |
 | `.env.example` | unknown | 1 |
 | `.env.example.backup-qwen3.6-27b` | unknown | 1 |
-| `.gitignore` | unknown | 1 |
 | `docker-compose.gateway-live.yml` | unknown | 1 |
 | `docker-compose.langfuse.yml` | unknown | 1 |
 | `.github` | unknown | 1 |
-| `docs` | doc | 1 |
 
 Full inventory: `docs/reports/FILE_TREE.full.md` (optional, not indexed).
 

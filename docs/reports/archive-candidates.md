@@ -1,6 +1,6 @@
 # Archive Candidates (confirmed D-tier only)
 
-> Generated: 2026-06-22 03:11:19 UTC
+> Generated: 2026-06-22 03:17:29 UTC
 
 Criteria: imported=false, reachable_static=false, observed_runtime=false, no env_gate.
 

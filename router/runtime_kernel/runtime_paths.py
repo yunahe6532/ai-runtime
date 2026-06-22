@@ -129,3 +129,14 @@ def audit_json_dir() -> Path:
     d = repo_tmp_dir()
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def archive_root() -> Path:
+    return _ensure_dir(runtime_data_dir() / "archive")
+
+
+def archive_dir(name: str, *, day: str | None = None) -> Path:
+    from datetime import datetime, timezone
+
+    stamp = day or datetime.now(timezone.utc).strftime("%Y%m%d")
+    return _ensure_dir(archive_root() / name / stamp)

@@ -2,6 +2,28 @@
 
 > **Product**: AI Runtime — Memory & Task Operating System · [VISION.md](./docs/VISION.md)
 
+## 2026-06-22 — Foreign Project / Vendor Cleanup (Phase 2.2a-clean2)
+
+### 신규
+- `scripts/audit-foreign-artifacts.py`
+- `scripts/clean-foreign-artifacts.py` (`--dry-run`, `--apply`, `--delete-vendor`)
+
+### 정리 결과
+- `scripts/pdf-export/node_modules` → `archive/vendor-dumps/` (415MB)
+- `.venv-llamaindex`, `ui/node_modules` → `archive/vendor-dumps/`
+- `tmp/*` → `AI_RUNTIME_DATA_DIR` (repo `tmp/.gitkeep`만 유지)
+- `docs/reports/FILE_TREE.full.md` → `archive/file-tree/`
+- repo inventory: **48,765 → 1,165 files**
+
+### docker-compose
+- 기본 volume: `~/.local/share/ai-runtime/{captures,cache/context-cache}`
+
+### 검증
+- 회귀 테스트 전부 PASS
+- benchmark 30/30 PASS
+
+---
+
 ## 2026-06-22 — Runtime Reachability Audit (Phase 2.2a-deep)
 
 ### 신규

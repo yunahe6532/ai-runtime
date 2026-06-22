@@ -1,6 +1,6 @@
 # Deprecated Branches (env-gated, not observed)
 
-> Generated: 2026-06-22 03:11:19 UTC
+> Generated: 2026-06-22 03:17:29 UTC
 
 | Env | Default | Modules | Reachable | Dead branch |
 |-----|---------|---------|-----------|-------------|

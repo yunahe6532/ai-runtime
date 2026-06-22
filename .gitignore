@@ -12,6 +12,7 @@ docs/reports/*.ndjson
 
 # python
 .venv*/
+.venv-llamaindex/
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -22,6 +23,10 @@ __pycache__/
 node_modules/
 ui/node_modules/
 scripts/**/node_modules/
+scripts/pdf-export/node_modules/
+
+# generated reports (large)
+docs/reports/FILE_TREE.full.md
 
 # benchmark/generated
 benchmarks/output/
