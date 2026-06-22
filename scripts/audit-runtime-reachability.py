@@ -58,8 +58,6 @@ TRACKED_ENVS: dict[str, str] = {
     "LLM_PLANNER_SHADOW_ENABLED": "0",
     "PLANNER_PROMOTION_GATE_ENABLED": "1",
     "PLANNER_PROMOTION_SHADOW_ONLY": "1",
-    "CONTEXT_OPTIMIZER": "1",
-    "RUNTIME_OPTIMIZER": "1",
 }
 
 ENV_RE = re.compile(r"os\.getenv\(\s*['\"]([A-Z0-9_]+)['\"]\s*,\s*['\"]([^'\"]*)['\"]")
@@ -312,10 +310,10 @@ def run_static() -> dict[str, Any]:
             rec.usage_class = "active_test_only"
             rec.recommendation = "keep"
         elif mod in ("legacy.context_optimizer", "legacy.runtime_optimizer"):
-            rec.usage_class = "imported_but_dead_branch"
-            rec.branch_condition = "env set but no import path from entrypoints"
+            rec.usage_class = "legacy_fallback"
+            rec.branch_condition = "archived stub — no env gate"
             rec.risk = "low"
-            rec.recommendation = "deprecate_env"
+            rec.recommendation = "archived"
         elif rec.env_gate and not any(_env_active(e, docker_defaults) for e in rec.env_gate):
             rec.usage_class = "active_optional"
             rec.branch_condition = f"env off by default: {','.join(rec.env_gate)}"
@@ -354,9 +352,7 @@ def run_static() -> dict[str, Any]:
             "modules_referencing": modules_with_env,
             "reachable_modules": reachable_mods,
             "imported_but_unreachable": imported_not_reached,
-            "likely_dead_branch": bool(modules_with_env) and not reachable_mods and env in (
-                "CONTEXT_OPTIMIZER", "RUNTIME_OPTIMIZER",
-            ),
+            "likely_dead_branch": bool(modules_with_env) and not reachable_mods,
         })
 
     payload = {
@@ -683,11 +679,10 @@ def _write_reports(payload: dict[str, Any], symbols: list[dict[str, Any]]) -> No
         )
     dlines += [
         "",
-        "## CONTEXT_OPTIMIZER / RUNTIME_OPTIMIZER",
+        "## Archived env (removed from compose)",
         "",
-        "- `legacy/context_optimizer.py` — **no import path** from entrypoints; env references only in dead module",
-        "- `legacy/runtime_optimizer.py` — same; docker-compose still sets `=1` but code never imports",
-        "- **Recommendation:** move env to Deprecated section; do not archive until reachability merge confirms",
+        "- `CONTEXT_OPTIMIZER` / `RUNTIME_OPTIMIZER` — removed from docker-compose; modules archived",
+        "- See `docs/reports/legacy-archive-applied.md`",
         "",
     ]
     (reports_dir() / "deprecated-branches.md").write_text("\n".join(dlines) + "\n", encoding="utf-8")
@@ -697,12 +692,15 @@ def _write_reports(payload: dict[str, Any], symbols: list[dict[str, Any]]) -> No
         "",
         f"> Generated: {ts}",
         "",
-        "Env vars that reference code with **no runtime reachability** from entrypoints.",
+        "## Removed from compose (archived 2026-06-22)",
         "",
-        "| Env | Default (compose) | Status | Module |",
-        "|-----|-------------------|--------|--------|",
-        "| `CONTEXT_OPTIMIZER` | 1 | **deprecated** — no import path | `legacy/context_optimizer.py` |",
-        "| `RUNTIME_OPTIMIZER` | 1 | **deprecated** — no import path | `legacy/runtime_optimizer.py` |",
+        "| Env | Former default | Status | Replacement |",
+        "|-----|----------------|--------|-------------|",
+        "| `CONTEXT_OPTIMIZER` | 1 | **archived** | `runtime_core/indexing_helpers` + `dynamic_context_scheduler` |",
+        "| `RUNTIME_OPTIMIZER` | 1 | **archived** | `prompt_enforcer` + `dynamic_context_scheduler` |",
+        "",
+        "Stub modules remain at `router/legacy/context_optimizer.py` and `runtime_optimizer.py`.",
+        "Full sources: `~/.local/share/ai-runtime/archive/deprecated/20260622/legacy/`.",
         "",
         "## Active optional (default off)",
         "",
@@ -712,6 +710,12 @@ def _write_reports(payload: dict[str, Any], symbols: list[dict[str, Any]]) -> No
         "| `LLAMAINDEX_ENABLED` | 0 | `integrations/llamaindex.py` |",
         "",
         "Remove from `.env.example` active section only after archive phase completes.",
+        "",
+        "## Planned (v2 — not archive)",
+        "",
+        "| Env | Default | Module |",
+        "|-----|---------|--------|",
+        "| `MCP_ENABLED` | 0 | `adapters/mcp.py` (stub) |",
         "",
     ]
     (reports_dir() / "deprecated-env.md").write_text("\n".join(env_lines) + "\n", encoding="utf-8")

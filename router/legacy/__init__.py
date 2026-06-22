@@ -7,12 +7,16 @@ import os
 LEGACY_OPTIMIZER = os.getenv("LEGACY_OPTIMIZER", "0") == "1"
 
 DEPRECATED_MODULES = (
-    "context_optimizer",
-    "runtime_optimizer",
     "memory_store",
     "retriever",
     "agent_runs",
 )
+
+ARCHIVED_MODULES = (
+    "context_optimizer",
+    "runtime_optimizer",
+)
+
 
 def legacy_optimizer_enabled() -> bool:
     return LEGACY_OPTIMIZER

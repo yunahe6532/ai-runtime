@@ -1,6 +1,6 @@
 # Dead Code Audit
 
-> Generated: 2026-06-22 03:17:29 UTC
+> Generated: 2026-06-22 03:21:36 UTC
 > Entrypoints: 5
 
 ## Summary
@@ -12,7 +12,7 @@
 | active_cli_only | 0 |
 | legacy_fallback | 6 |
 | planned | 0 |
-| dead_candidate | 75 |
+| dead_candidate | 76 |
 | unknown_needs_review | 3 |
 
 ## Dead candidates (sample)
@@ -32,6 +32,7 @@
 | `runtime_kernel.self_model` | `router/runtime_kernel/self_model.py` | - |
 | `scripts.analyze-conversation-flow` | `scripts/analyze-conversation-flow.py` | - |
 | `scripts.analyze-cursor-captures` | `scripts/analyze-cursor-captures.py` | - |
+| `scripts.archive-deprecated-legacy` | `scripts/archive-deprecated-legacy.py` | - |
 | `scripts.audit-dead-code` | `scripts/audit-dead-code.py` | - |
 | `scripts.audit-foreign-artifacts` | `scripts/audit-foreign-artifacts.py` | - |
 | `scripts.audit-repo-inventory` | `scripts/audit-repo-inventory.py` | - |
@@ -58,7 +59,6 @@
 | `scripts.clean-foreign-artifacts` | `scripts/clean-foreign-artifacts.py` | - |
 | `scripts.generate-dependency-graph` | `scripts/generate-dependency-graph.py` | - |
 | `scripts.generate-file-tree` | `scripts/generate-file-tree.py` | - |
-| `scripts.generate-project-structure` | `scripts/generate-project-structure.py` | - |
 
 ## Legacy fallback
 
@@ -66,10 +66,10 @@
 |--------|----------|-----------|
 | `router/legacy/__init__.py` | LEGACY_OPTIMIZER | True |
 | `router/legacy/agent_runs.py` | AGENT_RUNS_DIR, AGENT_RUNS_ENABLED, AGENT_RUNS_MAX_EVENTS, AGENT_RUNS_MAX_RUNS | True |
-| `router/legacy/context_optimizer.py` | CONTEXT_OPTIMIZER, OPTIMIZER_ERROR_KEEP_CHARS, OPTIMIZER_MODE, OPTIMIZER_PREVIEW_CHARS | False |
+| `router/legacy/context_optimizer.py` | - | False |
 | `router/legacy/memory_store.py` | CONTEXT_CACHE_DIR, MEMORY_STORE | True |
 | `router/legacy/retriever.py` | - | False |
-| `router/legacy/runtime_optimizer.py` | RUNTIME_OPTIMIZER, RUNTIME_OPTIMIZER_MIN_TOOL_CHARS, RUNTIME_OPTIMIZER_SHRINK_STEP, RUNTIME_OPTIMIZER_STATE | False |
+| `router/legacy/runtime_optimizer.py` | - | False |
 
 ## Unknown (needs review)
 
@@ -77,12 +77,12 @@
 - `router/observability/trace_ssot.py` ← observability
 - `router/runtime_core/evidence_keys.py` ← runtime_core.evidence_cluster
 
-## Known legacy archive candidates
+## Known legacy archive status
 
-| File | Notes |
-|------|-------|
-| `legacy/context_optimizer.py` | CONTEXT_OPTIMIZER path |
-| `legacy/runtime_optimizer.py` | RUNTIME_OPTIMIZER |
+| File | Status |
+|------|--------|
+| `legacy/context_optimizer.py` | **archived** 2026-06-22 (stub in repo) |
+| `legacy/runtime_optimizer.py` | **archived** 2026-06-22 (stub in repo) |
 | thin adapter wrappers | verify adapters/* usage |
 | old explorer/read_only code | superseded by read_only_explorer |
 

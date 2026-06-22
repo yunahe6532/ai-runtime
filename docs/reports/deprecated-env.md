@@ -1,13 +1,16 @@
 # Deprecated Environment Variables
 
-> Generated: 2026-06-22 03:17:29 UTC
+> Generated: 2026-06-22 03:21:36 UTC
 
-Env vars that reference code with **no runtime reachability** from entrypoints.
+## Removed from compose (archived 2026-06-22)
 
-| Env | Default (compose) | Status | Module |
-|-----|-------------------|--------|--------|
-| `CONTEXT_OPTIMIZER` | 1 | **deprecated** — no import path | `legacy/context_optimizer.py` |
-| `RUNTIME_OPTIMIZER` | 1 | **deprecated** — no import path | `legacy/runtime_optimizer.py` |
+| Env | Former default | Status | Replacement |
+|-----|----------------|--------|-------------|
+| `CONTEXT_OPTIMIZER` | 1 | **archived** | `runtime_core/indexing_helpers` + `dynamic_context_scheduler` |
+| `RUNTIME_OPTIMIZER` | 1 | **archived** | `prompt_enforcer` + `dynamic_context_scheduler` |
+
+Stub modules remain at `router/legacy/context_optimizer.py` and `runtime_optimizer.py`.
+Full sources: `~/.local/share/ai-runtime/archive/deprecated/20260622/legacy/`.
 
 ## Active optional (default off)
 
@@ -17,4 +20,10 @@ Env vars that reference code with **no runtime reachability** from entrypoints.
 | `LLAMAINDEX_ENABLED` | 0 | `integrations/llamaindex.py` |
 
 Remove from `.env.example` active section only after archive phase completes.
+
+## Planned (v2 — not archive)
+
+| Env | Default | Module |
+|-----|---------|--------|
+| `MCP_ENABLED` | 0 | `adapters/mcp.py` (stub) |
 

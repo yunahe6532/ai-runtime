@@ -2,6 +2,29 @@
 
 > **Product**: AI Runtime — Memory & Task Operating System · [VISION.md](./docs/VISION.md)
 
+## 2026-06-22 — Deprecated Env & Legacy Archive (Phase 2.2a-clean3)
+
+### 완료
+- `CONTEXT_OPTIMIZER` / `RUNTIME_OPTIMIZER` (+ `OPTIMIZER_*`) **docker-compose에서 제거**
+- `.env.example` Deprecated 섹션으로 이동 (로컬, git 미추적)
+- `legacy/context_optimizer.py`, `legacy/runtime_optimizer.py` → archive stub
+  - 원본: `~/.local/share/ai-runtime/archive/deprecated/20260622/legacy/`
+- `scripts/archive-deprecated-legacy.py` 추가
+- `docs/reports/legacy-archive-applied.md` — D-tier 3건(`adapters/mcp.py`) **unknown_needs_review** 유지
+
+### 미건드림
+- `legacy/memory_store.py`, `retriever.py`, `agent_runs.py`, `reference/` hot path
+
+### 검증
+- audit static/profile/merge + dead-code + repo-inventory 재생성
+- 회귀 E2E 전부 PASS
+- benchmark **30/30** PASS (router recreate 후)
+
+### 다음
+- **Phase 2.2b** — `read/grep/glob` 부분 승격 (`PLANNER_PROMOTION_SHADOW_ONLY=0` 조건부)
+
+---
+
 ## 2026-06-22 — Foreign Project / Vendor Cleanup (Phase 2.2a-clean2)
 
 ### 신규

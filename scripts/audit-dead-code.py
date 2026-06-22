@@ -41,10 +41,13 @@ CLASSIFICATIONS = (
 )
 
 LEGACY_CANDIDATES = [
-    "router/legacy/context_optimizer.py",
-    "router/legacy/runtime_optimizer.py",
     "router/legacy/retriever.py",
     "router/legacy/agent_runs.py",
+]
+
+ARCHIVED_LEGACY = [
+    "router/legacy/context_optimizer.py",
+    "router/legacy/runtime_optimizer.py",
 ]
 
 ENV_RE = re.compile(r"os\.getenv\(\s*['\"]([A-Z0-9_]+)['\"]")
@@ -230,12 +233,12 @@ def render_md(modules: dict[str, ModuleInfo]) -> str:
 
     lines += [
         "",
-        "## Known legacy archive candidates",
+        "## Known legacy archive status",
         "",
-        "| File | Notes |",
-        "|------|-------|",
-        "| `legacy/context_optimizer.py` | CONTEXT_OPTIMIZER path |",
-        "| `legacy/runtime_optimizer.py` | RUNTIME_OPTIMIZER |",
+        "| File | Status |",
+        "|------|--------|",
+        "| `legacy/context_optimizer.py` | **archived** 2026-06-22 (stub in repo) |",
+        "| `legacy/runtime_optimizer.py` | **archived** 2026-06-22 (stub in repo) |",
         "| thin adapter wrappers | verify adapters/* usage |",
         "| old explorer/read_only code | superseded by read_only_explorer |",
         "",
