@@ -112,6 +112,20 @@ def record_runtime_turn(
                     "action_match_rule_llm": triple.get("action_match_rule_llm"),
                     "triple_would_change_hot_path": triple.get("would_change_hot_path"),
                 })
+            promo = dict(
+                getattr(state, "last_planner_promotion", None)
+                or shadow.get("promotion_decision")
+                or (getattr(state, "last_runtime_turn", None) or {}).get("planner_promotion_decision")
+                or {}
+            )
+            if promo:
+                turn["planner_promotion_decision"] = promo
+                turn["planner_observability"].update({
+                    "promotion_eligible": promo.get("eligible"),
+                    "promotion_allowed_action": promo.get("allowed_action"),
+                    "promotion_blocked_reasons": promo.get("blocked_reasons"),
+                    "promotion_would_change_hot_path": promo.get("would_change_hot_path"),
+                })
         fr = dict(getattr(state, "last_runtime_turn", None) or {})
         if fr.get("final_report_used") is not None:
             turn["final_report_used"] = fr.get("final_report_used")

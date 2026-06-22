@@ -2,7 +2,90 @@
 
 > **Product**: AI Runtime — Memory & Task Operating System · [VISION.md](./docs/VISION.md)
 
-## 2026-06-22 — Phase 2.1 LLM Planner Shadow
+## 2026-06-22 — Runtime Reachability Audit (Phase 2.2a-deep)
+
+### 신규
+- `scripts/audit-runtime-reachability.py` — `--static`, `--profile`, `--merge`
+
+### 산출물
+- `docs/reports/runtime-reachability.md`
+- `docs/reports/deprecated-branches.md`
+- `docs/reports/deprecated-env.md`
+- `docs/reports/archive-candidates.md`
+- `tmp/runtime-reachability.json`
+
+### 핵심 발견
+- `CONTEXT_OPTIMIZER` / `RUNTIME_OPTIMIZER` → **imported_but_dead_branch** (env=1이지만 entrypoint에서 import 경로 없음)
+- D-tier archive 후보: **0건** (strict filter — 삭제/이동 보류)
+- `dead_candidate`: 3 (non-legacy peripheral)
+
+### 검증
+- 회귀 테스트 전부 PASS
+- benchmark 30/30 PASS
+
+### 다음
+- Phase 2.2a-clean: runtime artifact move + legacy archive (reachability 기준 적용)
+
+---
+
+## 2026-06-22 — Repo Hygiene & Dead Code Audit (Phase 2.2a hygiene)
+
+### 변경 파일
+- `router/runtime_kernel/runtime_paths.py` (신규) — `AI_RUNTIME_DATA_DIR` SSOT
+- `router/runtime_kernel/project_index.py` — `ProjectIndexConfig`, `classify_path`, ignore policy v2
+- `router/explorer_trace.py`, `router/legacy/memory_store.py` — runtime paths
+- `scripts/audit-repo-inventory.py`, `scripts/audit-dead-code.py`, `scripts/generate-project-structure.py` (신규)
+- `scripts/test-project-index-ignore-e2e.py` (신규)
+- `.gitignore`, `.dockerignore`, `router/.dockerignore`, `.env.example`, `docker-compose.yml`
+- `docs/PROJECT_STRUCTURE.md`, `docs/reports/*` (audit reports)
+- `docs/FILE_TREE.md` → `docs/reports/FILE_TREE.full.md` (이동)
+
+### 완료
+- Repo inventory / dead code / legacy archive plan 리포트 생성 (삭제 없음)
+- Runtime storage: `~/.local/share/ai-runtime` 기본, repo `tmp/` fallback
+- Project Index: vendor/tmp/cache/FILE_TREE 제외
+
+### 검증
+- `test-project-index-ignore-e2e.py` PASS
+- 기존 planner/trace/recovery/ping-pong PASS
+- `benchmark-runtime-score.py --tasks 30` (재실행 예정)
+
+### 다음 작업
+- Phase 2.2b hot path 승격 (read/grep/glob) — hygiene 완료 후
+- 선택: 오래된 `tmp/` artifact를 `AI_RUNTIME_DATA_DIR`로 archive 이동
+
+---
+
+## 2026-06-22 — Phase 2.2a Planner Promotion Gate
+
+### 변경 파일
+- `router/agent_brain/promotion_gate.py` (신규)
+- `router/agent_brain/planner_shadow.py` — promotion gate hook + trace
+- `router/explorer_trace.py`, `runtime_inspector.py`, `runtime_turn_log.py`, `legacy/memory_store.py`
+- `scripts/test-planner-promotion-gate-e2e.py` (신규)
+- `docs/REFACTOR.md`, `scripts/verify-router.sh`
+
+### 완료
+- `evaluate_promotion()` — read/grep/glob 승격 가능 여부 판정 (shadow-only, hot path 미변경)
+- dry_run_tool_call 생성 + trace `planner.promotion.*` 이벤트
+- Inspector Promotion Gate 섹션, turn_log `planner_promotion_decision`
+- metrics: eligible_rate, blocked_by_*, would_change_hot_path_rate
+
+### env
+- `PLANNER_PROMOTION_SHADOW_ONLY=1` (default)
+- `PLANNER_PROMOTION_MIN_CONFIDENCE=0.75`
+- `PLANNER_PROMOTION_MIN_TARGET_OVERLAP=0.5`
+
+### 검증
+- `test-planner-promotion-gate-e2e.py` 13/13 PASS
+- `benchmark-runtime-score.py --tasks 30` 30/30 PASS (재실행)
+
+### 다음 작업
+- **Phase 2.2b**: read/grep/glob 실제 hot path 부분 승격 (`PLANNER_PROMOTION_SHADOW_ONLY=0` + guard)
+
+---
+
+## 2026-06-22 — Phase 2.1 LLM Planner Shadow (pushed `81c4c4ae`)
 
 ### 변경 파일
 - `router/agent_brain/llm_planner.py` (신규)

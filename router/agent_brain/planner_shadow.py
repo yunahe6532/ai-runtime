@@ -291,6 +291,18 @@ def run_planner_shadow(
         llm_meta = {"enabled": True, "status": "error", "error": str(exc)[:200]}
         LOG.warning("llm planner shadow failed: %s", exc)
 
+    promotion_decision: dict[str, Any] | None = None
+    try:
+        from .promotion_gate import evaluate_promotion, promotion_gate_enabled
+
+        if promotion_gate_enabled() and llm_decision is not None:
+            promo = evaluate_promotion(rule, heuristic, llm_decision, brain_state, phase=phase)
+            promotion_decision = promo.to_dict()
+            session_state.last_planner_promotion = promotion_decision
+    except Exception as exc:
+        LOG.warning("promotion gate failed: %s", exc)
+        promotion_decision = {"eligible": False, "reason": f"error:{exc}", "blocked_reasons": ["error"]}
+
     payload = {
         "shadow_mode": True,
         "runtime_state_prompt_chars": len(brain_state.to_prompt_json()),
@@ -307,6 +319,7 @@ def run_planner_shadow(
         "llm_shadow_decision": llm_decision.to_dict() if llm_decision else None,
         "llm_shadow_meta": llm_meta,
         "triple_comparison": triple_comparison,
+        "promotion_decision": promotion_decision,
     }
 
     if triple_comparison:
@@ -321,6 +334,8 @@ def run_planner_shadow(
             "meta": llm_meta,
             "triple_comparison": triple_comparison,
         }
+    if promotion_decision:
+        rt["planner_promotion_decision"] = promotion_decision
     session_state.last_runtime_turn = rt
 
     _emit_planner_trace_events(
@@ -334,6 +349,7 @@ def run_planner_shadow(
         comparison=comparison,
         triple_comparison=triple_comparison,
         llm_meta=llm_meta,
+        promotion_decision=promotion_decision,
         payload=payload,
     )
 
@@ -363,6 +379,7 @@ def _emit_planner_trace_events(
     llm: PlannerDecision | None = None,
     triple_comparison: dict[str, Any] | None = None,
     llm_meta: dict[str, Any] | None = None,
+    promotion_decision: dict[str, Any] | None = None,
 ) -> None:
     try:
         from explorer_trace import write_explorer_trace
@@ -456,6 +473,47 @@ def _emit_planner_trace_events(
                     f"rule={triple_comparison.get('rule_action')} "
                     f"heuristic={triple_comparison.get('heuristic_action')} "
                     f"llm={triple_comparison.get('llm_action')}"
+                ),
+            )
+        if promotion_decision is not None:
+            event = (
+                "planner.promotion.eligible"
+                if promotion_decision.get("eligible")
+                else "planner.promotion.blocked"
+            )
+            write_explorer_trace(
+                "planner.promotion.evaluated",
+                phase=phase,
+                query=query,
+                turn_index=turn_index,
+                eligible=promotion_decision.get("eligible"),
+                allowed_action=promotion_decision.get("allowed_action"),
+                reason=promotion_decision.get("reason"),
+                blocked_reasons=promotion_decision.get("blocked_reasons"),
+                confidence=promotion_decision.get("confidence"),
+                target_overlap=promotion_decision.get("target_overlap"),
+                evidence_overlap=promotion_decision.get("evidence_overlap"),
+                risk_flags=promotion_decision.get("risk_flags"),
+                would_change_hot_path=promotion_decision.get("would_change_hot_path"),
+                shadow_only=promotion_decision.get("shadow_only"),
+                dry_run_tool_call=promotion_decision.get("dry_run_tool_call"),
+                metrics=promotion_decision.get("metrics"),
+                result_summary=str(promotion_decision.get("reason") or "")[:240],
+            )
+            write_explorer_trace(
+                event,
+                phase=phase,
+                query=query,
+                turn_index=turn_index,
+                eligible=promotion_decision.get("eligible"),
+                allowed_action=promotion_decision.get("allowed_action"),
+                reason=promotion_decision.get("reason"),
+                blocked_reasons=promotion_decision.get("blocked_reasons"),
+                dry_run_tool_call=promotion_decision.get("dry_run_tool_call"),
+                would_change_hot_path=promotion_decision.get("would_change_hot_path"),
+                result_summary=(
+                    f"eligible={promotion_decision.get('eligible')} "
+                    f"action={promotion_decision.get('allowed_action')}"
                 ),
             )
     except Exception as exc:

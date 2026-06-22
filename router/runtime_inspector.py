@@ -400,6 +400,30 @@ def _build_planner_runtime_section(state: Any | None) -> list[str]:
             lines.append("  would_change_hot_path: true")
         if shadow.get("target_overlap") is not None:
             lines.append(f"  target_overlap(rule↔heuristic): {shadow.get('target_overlap')}")
+        promo = dict(
+            shadow.get("promotion_decision")
+            or getattr(state, "last_planner_promotion", None)
+            or {}
+        )
+        if promo:
+            lines.append("")
+            lines.append("Promotion Gate (shadow-only)")
+            lines.append(f"  eligible: {promo.get('eligible')}")
+            lines.append(f"  allowed_action: {promo.get('allowed_action', 'none')}")
+            if promo.get("reason"):
+                lines.append(f"  reason: {str(promo.get('reason'))[:120]}")
+            blocked = list(promo.get("blocked_reasons") or [])
+            if blocked:
+                lines.append(f"  blocked: {', '.join(blocked[:3])}")
+            metrics = dict(promo.get("metrics") or {})
+            if metrics.get("eligible_rate") is not None:
+                lines.append(
+                    f"  metrics: eligible_rate={metrics.get('eligible_rate')} "
+                    f"would_change_rate={metrics.get('would_change_hot_path_rate')}"
+                )
+            dry = promo.get("dry_run_tool_call") or {}
+            if dry.get("function", {}).get("name"):
+                lines.append(f"  dry_run: {dry['function']['name']}")
     trace_path = ""
     try:
         from explorer_trace import default_trace_path

@@ -25,8 +25,23 @@ from capture import _content_text, _sha256
 
 LOG = logging.getLogger("router.memory")
 
-_DEFAULT_CACHE = Path(__file__).resolve().parents[1] / "tmp" / "context-cache"
-CACHE_DIR = Path(os.getenv("CONTEXT_CACHE_DIR", str(_DEFAULT_CACHE)))
+_DEFAULT_CACHE = None
+
+
+def _default_cache_dir() -> Path:
+    global _DEFAULT_CACHE
+    if _DEFAULT_CACHE is not None:
+        return _DEFAULT_CACHE
+    try:
+        from runtime_kernel.runtime_paths import context_cache_dir
+        _DEFAULT_CACHE = context_cache_dir()
+    except ImportError:
+        _DEFAULT_CACHE = Path(__file__).resolve().parents[1] / "tmp" / "context-cache"
+    return _DEFAULT_CACHE
+
+
+_cc = (os.getenv("CONTEXT_CACHE_DIR") or "").strip()
+CACHE_DIR = Path(_cc).expanduser() if _cc else _default_cache_dir()
 DELTA_DIR = CACHE_DIR / "deltas"
 ARTIFACT_DIR = CACHE_DIR / "artifacts"
 META_DIR = CACHE_DIR / "meta"
@@ -155,6 +170,7 @@ class SessionState:
     planner_runtime_state_prompt: str = ""
     last_planner_shadow: dict[str, Any] = field(default_factory=dict)
     last_planner_llm_shadow: dict[str, Any] = field(default_factory=dict)
+    last_planner_promotion: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

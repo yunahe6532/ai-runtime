@@ -6,6 +6,7 @@ Bootstrap runs via tool pipeline (find/glob), not LLM inference.
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import logging
@@ -13,17 +14,141 @@ import os
 import subprocess
 import time
 from dataclasses import asdict, dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 LOG = logging.getLogger("runtime_kernel.project_index")
 
-INDEX_VERSION = 1
-SKIP_DIRS = frozenset({
-    ".git", "node_modules", "__pycache__", ".venv", "dist", "build",
-    ".codex", "tmp", ".cursor", "ui/node_modules",
+INDEX_VERSION = 2
+
+DEFAULT_INCLUDE_DIRS = frozenset({
+    "router", "runtime_kernel", "runtime_core", "agent_brain", "adapters",
+    "reference", "legacy", "observability", "integrations", "docs", "scripts",
+    "config", "configs", "tests", "ui",
 })
+
+DEFAULT_EXCLUDE_DIRS = frozenset({
+    ".git", "node_modules", "__pycache__", ".pytest_cache", ".venv", ".venv-llamaindex",
+    ".venv-llamaindex", "tmp", "captures", "dist", "build", "coverage",
+    ".cursor", ".codex", ".runtime-index", ".project-index", "langfuse-data",
+    "benchmarks", "benchmark-results",
+})
+
+DEFAULT_EXCLUDE_GLOBS = (
+    "*.ndjson", "*.log", "*.trace", "*.pyc", "*.pyo",
+    "docs/FILE_TREE.md", "docs/reports/FILE_TREE.full.md",
+)
+
 SCAN_EXTENSIONS = frozenset({".py", ".md", ".yaml", ".yml", ".json", ".toml", ".sh"})
+
+
+class PathClass(str, Enum):
+    SOURCE = "source"
+    DOC = "doc"
+    CONFIG = "config"
+    TEST = "test"
+    SCRIPT = "script"
+    VENDOR = "vendor"
+    GENERATED = "generated"
+    RUNTIME_DATA = "runtime_data"
+    CACHE = "cache"
+    GIT_METADATA = "git_metadata"
+    UNKNOWN = "unknown"
+
+
+@dataclass
+class ProjectIndexConfig:
+    include_dirs: frozenset[str] = field(default_factory=lambda: DEFAULT_INCLUDE_DIRS)
+    exclude_dirs: frozenset[str] = field(default_factory=lambda: DEFAULT_EXCLUDE_DIRS)
+    exclude_globs: tuple[str, ...] = DEFAULT_EXCLUDE_GLOBS
+    max_file_size: int = 2_000_000
+    max_files_per_dir: int = 500
+    max_files: int = 500
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "include_dirs": sorted(self.include_dirs),
+            "exclude_dirs": sorted(self.exclude_dirs),
+            "exclude_globs": list(self.exclude_globs),
+            "max_file_size": self.max_file_size,
+            "max_files_per_dir": self.max_files_per_dir,
+            "max_files": self.max_files,
+        }
+
+
+def _normalize_relpath(path: str | Path) -> str:
+    p = str(path).replace("\\", "/")
+    while p.startswith("./"):
+        p = p[2:]
+    return p.lstrip("/")
+
+
+def classify_path(path: str | Path, *, workspace: str | Path | None = None) -> PathClass:
+    """Classify a repo-relative or absolute path for index inclusion policy."""
+    p = _normalize_relpath(path)
+    parts = [x for x in p.split("/") if x]
+    if not parts:
+        return PathClass.UNKNOWN
+
+    if parts[0] == ".git" or ".git" in parts:
+        return PathClass.GIT_METADATA
+
+    lower_parts = {x.lower() for x in parts}
+    if lower_parts & {"node_modules", ".venv", ".venv-llamaindex"}:
+        return PathClass.VENDOR
+    if "tmp" in lower_parts or "captures" in lower_parts:
+        return PathClass.RUNTIME_DATA
+    if "__pycache__" in lower_parts or ".pytest_cache" in lower_parts:
+        return PathClass.CACHE
+    if parts[0] in ("dist", "build", "coverage", "benchmark-results", "benchmarks"):
+        return PathClass.GENERATED
+
+    name = parts[-1]
+    if name in ("FILE_TREE.md", "FILE_TREE.full.md") or "FILE_TREE" in name:
+        return PathClass.GENERATED
+    for pat in DEFAULT_EXCLUDE_GLOBS:
+        if fnmatch.fnmatch(p, pat) or fnmatch.fnmatch(name, pat):
+            return PathClass.GENERATED
+
+    if name.startswith("test_") or "/tests/" in f"/{p}/" or parts[0] == "tests":
+        return PathClass.TEST
+    if parts[0] in ("scripts",):
+        return PathClass.SCRIPT
+    if parts[0] in ("docs",) or name.endswith(".md"):
+        return PathClass.DOC
+    if parts[0] in ("config", "configs") or name in (
+        "docker-compose.yml", "pyproject.toml", ".gitignore", ".dockerignore",
+    ):
+        return PathClass.CONFIG
+    if name.endswith(".py") and parts[0] in DEFAULT_INCLUDE_DIRS:
+        return PathClass.SOURCE
+    if parts[0] in DEFAULT_INCLUDE_DIRS:
+        return PathClass.SOURCE
+    return PathClass.UNKNOWN
+
+
+def path_included_in_index(relpath: str, cfg: ProjectIndexConfig | None = None) -> bool:
+    pc = classify_path(relpath)
+    return pc in {
+        PathClass.SOURCE, PathClass.DOC, PathClass.CONFIG,
+        PathClass.TEST, PathClass.SCRIPT,
+    }
+
+
+def _should_skip_dir(name: str, cfg: ProjectIndexConfig) -> bool:
+    if name in cfg.exclude_dirs:
+        return True
+    if name.startswith(".") and name not in {".github"}:
+        return True
+    return False
+
+
+def _matches_exclude_glob(relpath: str, cfg: ProjectIndexConfig) -> bool:
+    for pat in cfg.exclude_globs:
+        if fnmatch.fnmatch(relpath, pat) or fnmatch.fnmatch(Path(relpath).name, pat):
+            return True
+    return False
 
 
 @dataclass
@@ -33,6 +158,7 @@ class FileEntry:
     size: int
     mtime: float
     content_hash: str
+    path_class: str = "source"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -51,6 +177,8 @@ class ProjectIndex:
     files: list[dict[str, Any]] = field(default_factory=list)
     entrypoints: list[str] = field(default_factory=list)
     symbol_hints: list[str] = field(default_factory=list)
+    excluded_summary: dict[str, Any] = field(default_factory=dict)
+    index_config: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -90,28 +218,70 @@ def _git_head(workspace: str) -> str:
     return ""
 
 
-def _scan_workspace(workspace: str, *, max_files: int = 500) -> tuple[list[FileEntry], list[str]]:
+def _scan_workspace(
+    workspace: str,
+    *,
+    cfg: ProjectIndexConfig | None = None,
+) -> tuple[list[FileEntry], list[str], dict[str, Any]]:
+    config = cfg or ProjectIndexConfig()
     root = Path(workspace).expanduser().resolve()
     if not root.is_dir():
-        return [], []
+        return [], [], {}
+
     files: list[FileEntry] = []
     dirs_seen: set[str] = set()
+    excluded: dict[str, dict[str, Any]] = {}
+    per_dir_counts: dict[str, int] = {}
+
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
+        dirnames[:] = [d for d in dirnames if not _should_skip_dir(d, config)]
         rel_dir = str(Path(dirpath).relative_to(root))
         if rel_dir != ".":
             dirs_seen.add(rel_dir.replace("\\", "/"))
+            top = rel_dir.split("/")[0].replace("\\", "/")
+            if top in config.exclude_dirs or classify_path(rel_dir) in (
+                PathClass.VENDOR, PathClass.RUNTIME_DATA, PathClass.CACHE, PathClass.GENERATED,
+            ):
+                key = top
+                excluded.setdefault(key, {"reason": classify_path(rel_dir).value, "files": 0})
+                excluded[key]["files"] += len(filenames)
+                dirnames.clear()
+                continue
+
         for name in filenames:
-            if len(files) >= max_files:
+            if len(files) >= config.max_files:
                 break
             p = Path(dirpath) / name
+            rel = str(p.relative_to(root)).replace("\\", "/")
+            pc = classify_path(rel)
+
+            if not path_included_in_index(rel, config):
+                top = rel.split("/")[0]
+                excluded.setdefault(top, {"reason": pc.value, "files": 0})
+                excluded[top]["files"] += 1
+                continue
+
             if p.suffix.lower() not in SCAN_EXTENSIONS:
                 continue
+            if _matches_exclude_glob(rel, config):
+                excluded.setdefault("globs", {"reason": "exclude_glob", "files": 0})
+                excluded["globs"]["files"] += 1
+                continue
+
             try:
                 st = p.stat()
             except OSError:
                 continue
-            rel = str(p.relative_to(root)).replace("\\", "/")
+            if st.st_size > config.max_file_size:
+                excluded.setdefault("oversized", {"reason": "max_file_size", "files": 0})
+                excluded["oversized"]["files"] += 1
+                continue
+
+            parent = str(Path(rel).parent)
+            per_dir_counts[parent] = per_dir_counts.get(parent, 0) + 1
+            if per_dir_counts[parent] > config.max_files_per_dir:
+                continue
+
             files.append(
                 FileEntry(
                     path=str(p),
@@ -119,9 +289,11 @@ def _scan_workspace(workspace: str, *, max_files: int = 500) -> tuple[list[FileE
                     size=int(st.st_size),
                     mtime=float(st.st_mtime),
                     content_hash=_file_hash(p),
+                    path_class=pc.value,
                 )
             )
-    return files, sorted(dirs_seen)[:200]
+
+    return files, sorted(dirs_seen)[:200], excluded
 
 
 def _fingerprint(files: list[FileEntry], git_commit: str) -> str:
@@ -142,12 +314,18 @@ def _detect_entrypoints(files: list[FileEntry]) -> list[str]:
     return hints[:12]
 
 
-def bootstrap_project_index(workspace: str, project_key: str = "") -> ProjectIndex:
+def bootstrap_project_index(
+    workspace: str,
+    project_key: str = "",
+    *,
+    cfg: ProjectIndexConfig | None = None,
+) -> ProjectIndex:
     """One-time (or stale) project scan — shell/filesystem, not LLM."""
+    config = cfg or ProjectIndexConfig()
     ws = str(Path(workspace).expanduser().resolve()) if workspace else ""
     pk = project_key or hashlib.sha256(ws.encode()).hexdigest()[:12] if ws else "unknown"
     git_commit = _git_head(ws) if ws else ""
-    file_entries, dir_tree = _scan_workspace(ws) if ws else ([], [])
+    file_entries, dir_tree, excluded = _scan_workspace(ws, cfg=config) if ws else ([], [], {})
     fp = _fingerprint(file_entries, git_commit)
     entrypoints = _detect_entrypoints(file_entries)
     symbol_hints = [
@@ -165,10 +343,12 @@ def bootstrap_project_index(workspace: str, project_key: str = "") -> ProjectInd
         files=[f.to_dict() for f in file_entries],
         entrypoints=entrypoints,
         symbol_hints=symbol_hints,
+        excluded_summary=excluded,
+        index_config=config.to_dict(),
     )
     LOG.info(
-        "project_index_bootstrap pk=%s files=%d dirs=%d fingerprint=%s git=%s",
-        pk, len(file_entries), len(dir_tree), fp, git_commit or "-",
+        "project_index_bootstrap pk=%s files=%d dirs=%d excluded_keys=%d fingerprint=%s git=%s",
+        pk, len(file_entries), len(dir_tree), len(excluded), fp, git_commit or "-",
     )
     return idx
 
@@ -188,7 +368,7 @@ def index_is_stale(stored: ProjectIndex | dict[str, Any] | None, workspace: str)
     if current_git and idx.git_commit and current_git != idx.git_commit:
         return True
     if ws:
-        sample, _ = _scan_workspace(ws, max_files=32)
+        sample, _, _ = _scan_workspace(ws, cfg=ProjectIndexConfig())
         current_fp = _fingerprint(sample, current_git)
         if idx.project_fingerprint and current_fp != idx.project_fingerprint:
             return True

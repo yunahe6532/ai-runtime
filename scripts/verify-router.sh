@@ -9,6 +9,11 @@ python3 scripts/test-evidence-judge.py
 python3 scripts/test-planner-runtime-state-e2e.py
 python3 scripts/test-explorer-trace-e2e.py
 python3 scripts/test-llm-planner-shadow-e2e.py
+python3 scripts/test-planner-promotion-gate-e2e.py
+python3 scripts/test-project-index-ignore-e2e.py
+python3 scripts/audit-runtime-reachability.py --static
+python3 scripts/audit-runtime-reachability.py --profile
+python3 scripts/audit-runtime-reachability.py --merge
 python3 scripts/test-evidence-journal-report-e2e.py
 python3 scripts/test-runtime-inspector.py
 python3 scripts/test-agent-exec.py

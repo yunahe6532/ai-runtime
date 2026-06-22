@@ -16,6 +16,7 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -25,9 +26,12 @@ from typing import Any
 import httpx
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUT = ROOT / "tmp" / "benchmark-runtime-score.json"
-FLOW_DIR = ROOT / "tmp" / "cursor-captures"
-CACHE_DIR = ROOT / "tmp" / "context-cache"
+sys.path.insert(0, str(ROOT / "router"))
+from runtime_kernel.runtime_paths import benchmarks_dir, captures_dir, context_cache_dir  # noqa: E402
+
+DEFAULT_OUT = benchmarks_dir() / "benchmark-runtime-score.json"
+FLOW_DIR = captures_dir()
+CACHE_DIR = context_cache_dir()
 PROJECTS_DIR = CACHE_DIR / "projects"
 ROUTER = "http://localhost:8080"
 MODEL = "model.gguf"

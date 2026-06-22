@@ -95,7 +95,52 @@ env: `PLANNER_SHADOW_MODE=1` (default on), `MAX_RUNTIME_STATE_PROMPT_CHARS=8000`
 
 Phase 2.1 ✅: LLM planner shadow — `agent_brain/llm_planner.py`, 3-way compare
 
-Phase 2.2 (next): read/grep/glob 부분 승격 (edit/shell/final은 hard guard 유지)
+Phase 2.2 (next): read/grep/glob 실제 hot path 부분 승격
+
+---
+
+### Repo Hygiene & Dead Code Audit ✅ (2026-06-22)
+
+| 항목 | 내용 |
+|------|------|
+| `runtime_kernel/runtime_paths.py` | `AI_RUNTIME_DATA_DIR` → captures/traces/cache/benchmarks |
+| `project_index.py` v2 | `ProjectIndexConfig`, `classify_path`, vendor/tmp 제외 |
+| Audit | `audit-repo-inventory.py`, `audit-dead-code.py` |
+| Docs | `PROJECT_STRUCTURE.md`, `docs/reports/*.md` |
+
+```bash
+python3 scripts/audit-repo-inventory.py
+python3 scripts/audit-dead-code.py
+python3 scripts/generate-project-structure.py
+python3 scripts/test-project-index-ignore-e2e.py
+```
+
+---
+
+### Phase 2.2a — Planner Promotion Gate ✅ (2026-06-22)
+
+| 모듈 | 역할 |
+|------|------|
+| `agent_brain/promotion_gate.py` | `evaluate_promotion()` — read/grep/glob 승격 가능 여부 판정 (shadow-only) |
+
+env (`PLANNER_PROMOTION_SHADOW_ONLY=1` default — hot path 미변경):
+
+| 변수 | default |
+|------|---------|
+| `PLANNER_PROMOTION_GATE_ENABLED` | `1` |
+| `PLANNER_PROMOTION_SHADOW_ONLY` | `1` |
+| `PLANNER_PROMOTION_MIN_CONFIDENCE` | `0.75` |
+| `PLANNER_PROMOTION_MIN_TARGET_OVERLAP` | `0.5` |
+
+trace: `planner.promotion.evaluated`, `planner.promotion.blocked`, `planner.promotion.eligible`
+
+```bash
+python3 scripts/test-planner-promotion-gate-e2e.py
+```
+
+---
+
+Phase 2.2 (next): read/grep/glob 실제 hot path 부분 승격 (edit/shell/final은 hard guard 유지)
 
 ---
 
@@ -117,7 +162,7 @@ env (`LLM_PLANNER_SHADOW_ENABLED=0` default — shadow only):
 trace: `planner.llm.proposed`, `planner.triple_compared`
 
 ```bash
-python3 scripts/test-llm-planner-shadow-e2e.py
+python3 scripts/test-planner-promotion-gate-e2e.py
 ```
 
 ---
@@ -173,7 +218,7 @@ LLM optional polish only
 
 ```bash
 python3 scripts/test-planner-runtime-state-e2e.py
-python3 scripts/test-llm-planner-shadow-e2e.py
+python3 scripts/test-planner-promotion-gate-e2e.py
 python3 scripts/test-explorer-trace-e2e.py
 python3 scripts/test-evidence-journal-report-e2e.py
 python3 scripts/benchmark-recovery-e2e.py

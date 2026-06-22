@@ -27,7 +27,11 @@ _active_trace_path: Path | None = None
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    try:
+        from runtime_kernel.runtime_paths import repo_root
+        return repo_root()
+    except ImportError:
+        return Path(__file__).resolve().parents[1]
 
 
 def default_trace_path() -> Path:
@@ -38,10 +42,11 @@ def default_trace_path() -> Path:
     if env:
         _active_trace_path = Path(env)
         return _active_trace_path
-    if Path("/captures").is_dir():
-        _active_trace_path = Path("/captures/explorer-trace.ndjson")
-        return _active_trace_path
-    p = _repo_root() / "tmp" / "cursor-captures" / "explorer-trace.ndjson"
+    try:
+        from runtime_kernel.runtime_paths import explorer_trace_file
+        p = explorer_trace_file()
+    except ImportError:
+        p = _repo_root() / "tmp" / "cursor-captures" / "explorer-trace.ndjson"
     if p.exists() and not os.access(p, os.W_OK):
         alt = p.parent / f"explorer-trace-host-{os.getuid()}.ndjson"
         LOG.warning("explorer trace not writable path=%s — using %s", p, alt)
@@ -325,6 +330,35 @@ def format_flow_event(row: dict[str, Any]) -> str | None:
                 lines.append(f"  mismatch: {mismatch}")
             if row.get("would_change_hot_path"):
                 lines.append("  ⚠ would_change_hot_path=true")
+        return "\n".join(lines)
+
+    if event in (
+        "planner.promotion.evaluated",
+        "planner.promotion.blocked",
+        "planner.promotion.eligible",
+    ):
+        eligible = row.get("eligible")
+        label = "eligible" if event.endswith("eligible") else ("blocked" if event.endswith("blocked") else "evaluated")
+        action = str(row.get("allowed_action") or "none")
+        lines.append(f"[{ts}] promotion {label} · {action}{phase_s}{fid}")
+        reason = str(row.get("reason") or "").strip()
+        if reason:
+            lines.append(f"  reason: {reason[:240]}")
+        blocked = row.get("blocked_reasons")
+        if blocked:
+            lines.append(f"  blocked: {blocked}")
+        if row.get("would_change_hot_path"):
+            lines.append("  ⚠ would_change_hot_path=true")
+        dry = row.get("dry_run_tool_call") or {}
+        fn = (dry.get("function") or {}) if isinstance(dry, dict) else {}
+        if fn.get("name"):
+            lines.append(f"  dry_run: {fn.get('name')}")
+        metrics = row.get("metrics") or {}
+        if isinstance(metrics, dict) and metrics.get("eligible_rate") is not None:
+            lines.append(
+                f"  metrics: eligible_rate={metrics.get('eligible_rate')} "
+                f"blocked_action={metrics.get('blocked_by_action')}"
+            )
         return "\n".join(lines)
 
     if event in ("tool.requested", "tool.completed"):

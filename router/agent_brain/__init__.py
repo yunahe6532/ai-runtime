@@ -19,6 +19,15 @@ from .planner_shadow import (
     run_planner_shadow,
     run_planner_shadow_if_enabled,
 )
+from .promotion_gate import (
+    PromotionDecision,
+    evaluate_promotion,
+    promotion_gate_enabled,
+    promotion_metrics_snapshot,
+    promotion_min_confidence,
+    promotion_shadow_only,
+    reset_promotion_metrics,
+)
 from .runtime_state import (
     MAX_RUNTIME_STATE_ANCHOR_ITEMS,
     MAX_RUNTIME_STATE_JOURNAL_ITEMS,
@@ -54,4 +63,11 @@ __all__ = [
     "propose_llm_shadow_decision",
     "compare_shadow_decisions",
     "compare_triple_decisions",
+    "PromotionDecision",
+    "evaluate_promotion",
+    "promotion_gate_enabled",
+    "promotion_shadow_only",
+    "promotion_min_confidence",
+    "promotion_metrics_snapshot",
+    "reset_promotion_metrics",
 ]

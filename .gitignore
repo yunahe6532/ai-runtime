@@ -1,29 +1,50 @@
-# Python
+# Runtime data
+tmp/
+captures/
+*.ndjson
+*.trace
+*.log
+
+# generated reports
+docs/FILE_TREE.md
+docs/reports/*.json
+docs/reports/*.ndjson
+
+# python
+.venv*/
 __pycache__/
 *.py[cod]
 *.egg-info/
-.venv/
-.venv-*/
 *.egg
+.pytest_cache/
 
-# Runtime data
-tmp/
-*.ndjson
-.env
-.env.*
+# node
+node_modules/
+ui/node_modules/
+scripts/**/node_modules/
+
+# benchmark/generated
+benchmarks/output/
+benchmark-results/
+coverage/
+dist/
+build/
+
+# local indexes
+.runtime-index/
+.project-index/
 
 # Models / large assets
 *.gguf
 models/
 
+# secrets / env
+.env
+.env.*
+
 # IDE
 .cursor/
 .vscode/
-
-# Node
-node_modules/
-scripts/pdf-export/node_modules/
-ui/node_modules/
 
 # OS
 .DS_Store
@@ -31,3 +52,7 @@ Thumbs.db
 
 # Langfuse / docker volumes (if local)
 langfuse-data/
+
+# exceptions
+!docs/reports/*.md
+!tmp/.gitkeep
