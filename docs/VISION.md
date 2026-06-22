@@ -1,533 +1,297 @@
-# AI Runtime — Context Runtime for Every IDE
+# AI Runtime — Local LLM Runtime Layer
 
-> **AI Runtime은 로컬 LLM 주변에 Memory Hierarchy를 구성하고, GPU context에는 현재 작업에 필요한 working set만 올리는 실행 계층이다.**
->
-> API LLM은 매 요청이 stateless라 full history를 반복 전송한다. 로컬 LLM은 Runtime Memory(RAM/DB/artifact/vector)에 맥락을 저장하고, **GPU Context = 작업 메모리(L1)** 에 필요한 것만 올린다.
+> **AI Runtime은 API Agent를 위한 Context 압축기가 아니다.**  
+> **로컬 LLM이 장시간 프로젝트를 수행할 수 있도록 Project Memory, Working Set, GPU Context를 관리하는 실행 계층(Runtime Layer)이다.**  
+> **LLM은 Thinking을 담당하고, Runtime은 Memory와 Context를 담당한다.**
 
 | | |
 |---|---|
-| **제품** | **Context Runtime** (v1) — Universal AI Runtime의 첫 SKU |
-| **구현** | Cursor + Local LLM **Runtime Middleware** (참조 구현) |
-| **하지 않는 것** | IDE · Cursor 경쟁 · VSCode Fork · “OS” 브랜딩 |
+| **제품** | **AI Runtime** — Local LLM Memory & Context Scheduler |
+| **v1 SKU** | Memory Scheduler + Working Set + Project Index (Cursor 참조 구현) |
+| **구현** | `cursor-local-llm` — Cursor + llama.cpp middleware |
+| **하지 않는 것** | Prompt Engineering 회사 · IDE · Cursor 경쟁 · “KV에 다 넣어두기” |
 
 ---
 
-## 문서 구조 (3분할)
+## 문서 구조
 
 | 문서 | 독자 | 내용 |
 |------|------|------|
-| **[VISION.md](./VISION.md)** (이 문서) | 투자자 · PM · 파트너 | Problem · Product · Business · Roadmap + **핵심 Flow 요약** |
-| **[ARCHITECTURE.md](./ARCHITECTURE.md)** | 개발자 · 기술 심사 | Pipeline · Need · Budget · Recovery · Closed Loop · Module Map · Sequence |
-| **[BENCHMARK.md](./BENCHMARK.md)** | 검증 · 구매 담당 | 수치 · 그래프 · 재현 명령 |
-| **[dependency-before-after.md](./dependency-before-after.md)** | 구조 심사 · 리팩토링 증명 | Before/After import graph · Memory Hierarchy path |
-
-기술 심화: [MODULE_MAP.md](./MODULE_MAP.md) · [INTEGRATIONS.md](./INTEGRATIONS.md)
+| **[VISION.md](./VISION.md)** | 투자자 · PM | 철학 · Problem · Product · Roadmap |
+| **[ARCHITECTURE.md](./ARCHITECTURE.md)** | 개발 · 심사 | Pipeline · Module · Sequence · Audit |
+| **[REFACTOR.md](./REFACTOR.md)** | 엔지니어링 | 3-tier 리셋 · Phase 계획 |
+| **[BENCHMARK.md](./BENCHMARK.md)** | 검증 | 수치 · 재현 |
 
 ---
 
 ## 목차
 
-1. [Problem — 왜 필요한가](#1-problem--왜-필요한가)
-2. [Market Pain](#2-market-pain)
-3. [Why Existing Solutions Fail](#3-why-existing-solutions-fail)
-4. [Our Runtime — 한 장 요약](#4-our-runtime--한-장-요약)
-5. [제품 정의](#5-제품-정의)
-6. [Architecture Snapshot](#6-architecture-snapshot)
-7. [Benchmark Snapshot](#7-benchmark-snapshot)
-8. [Business](#8-business)
-9. [Roadmap](#9-roadmap)
+1. [설계 철학](#1-설계-철학)
+2. [Problem — API vs Local](#2-problem--api-vs-local)
+3. [Runtime Memory vs GPU Context](#3-runtime-memory-vs-gpu-context)
+4. [Runtime 구성요소](#4-runtime-구성요소)
+5. [Master Flow](#5-master-flow)
+6. [Build vs Buy](#6-build-vs-buy)
+7. [제품 · Roadmap](#7-제품--roadmap)
+8. [Benchmark Snapshot](#8-benchmark-snapshot)
 
 ---
 
-## 1. Problem — 왜 필요한가
+## 1. 설계 철학
 
-LLM 능력은 빠르게 성장했지만, **실행 스택은 거의 진화하지 못했다.**
+### 1.1 한 줄
+
+Runtime은 LLM 대신 **생각하지 않는다**. LLM이 **생각하기 좋은 환경**을 만든다.
+
+```text
+Runtime Memory (cold)     →  Project Index · Session · Artifact · Journal · Evidence
+Working Set Planner       →  이번 turn에 GPU에 올릴 최소 집합 선별
+Prompt Pack               →  Working Set의 LLM-facing 표현
+GPU Context / KV prefix   →  작업 메모리 (cache) — 장기 memory 아님
+Local LLM                 →  Thinking · Tool 선택 · Final prose
+```
+
+### 1.2 GPU Context ≠ Memory
+
+| | GPU Context / KV | Runtime Memory |
+|--|------------------|----------------|
+| 역할 | CPU L1 cache | RAM / DB / artifact store |
+| 수명 | 현재 prefix · turn | 프로젝트 · 세션 · journal |
+| 내용 | Working Set만 | Index · delta · tool · evidence |
+| LLM이 “기억” | ❌ (재계산 캐시) | ✅ (Runtime이 조회) |
+
+**로컬 LLM도 자동으로 장기 기억하지 않는다.** KV는 prefix 계산 캐시일 뿐, semantic project memory가 아니다.
+
+### 1.3 Prompt 회사가 아니다
+
+```text
+우리는 Prompt를 잘 만드는 회사가 아니다.
+
+LLM이 무엇을 보고 · 읽고 · 기억하고 · 버릴지를 관리하는 Runtime을 만든다.
+```
+
+Context **압축률**은 부수 지표이고, **목표는 장시간 로컬 작업 연속성**이다.
+
+### 1.4 Runtime = 경량 OS (비유)
+
+```text
+AI Runtime
+ ├── Project Index Manager      (구조 map · invalidation)
+ ├── Memory Manager             (session · artifact · journal)
+ ├── Working Set Manager        (hot path — GPU에 올릴 것)
+ ├── Context Scheduler          (budget · retrieve · summarize)
+ ├── Evidence Manager           (anchor + summary)
+ ├── Task Journal / Handoff     (작업 연속성)
+ ├── Tool Coordinator           (결과 저장 — thinking은 LLM)
+ └── GPU Context Manager        (KV prefix = 보조 최적화)
+```
+
+---
+
+## 2. Problem — API vs Local
+
+### API Agent (Stateless)
+
+매 요청: System + Tools + Full History + Project State + Prior Results **재전송**  
+→ 비용 · 지연 · blind truncate
+
+### Local LLM (Runtime co-located)
+
+Runtime이 옆에서 **Project Memory** 유지 → LLM은 **Working Set**만 수신  
+→ Thinking은 LLM, Memory는 Runtime
 
 ```mermaid
 flowchart TB
-    subgraph before["오늘 (문제)"]
-        App1[IDE / Agent] --> Eng1[Inference Engine]
-        Eng1 --> HW1[GPU]
+    subgraph api["API Agent"]
+        A1[IDE] -->|매 turn 100K+ history| A2[Cloud LLM]
     end
-    subgraph after["목표"]
-        App2[IDE / Agent] --> RT[AI Runtime]
-        RT --> Eng2[Inference Engine]
-        Eng2 --> HW2[GPU]
+    subgraph local["Local LLM + AI Runtime"]
+        L1[IDE] -->|delta only| RT[AI Runtime]
+        RT --> MEM[(Runtime Memory)]
+        RT -->|Working Set ~3-10K| L2[Local LLM]
+        MEM --> RT
     end
 ```
 
-Application이 Engine에 직접 붙으면:
+---
 
-- 컨텍스트 무한 성장 → **API 비용 · OOM · 지연**
-- blind truncate → **근거 없는 답**
-- Agent 반복 Read → **루프 · ping-pong**
+## 3. Runtime Memory vs GPU Context
 
-**cursor-local-llm**은 Cursor 위에서 Context Runtime MVP를 검증하는 **첫 참조 구현**이다.
+### 3.1 Memory tiers
 
-### 1.1 LLM Memory Hierarchy (제품 핵심)
+| Tier | 저장 | GPU |
+|------|------|:---:|
+| **Project Index** | dir tree · entrypoints · file hash · git commit | ❌ |
+| **Session Memory** | delta · dialogue tail · task state | tail만 |
+| **Artifact Memory** | tool/file raw + excerpt | 필요분 |
+| **Evidence Memory** | path · symbol · line · hash · summary | anchor |
+| **Task Journal** | read/edit/tool/failure/success | ❌ |
+| **Handoff Ledger** | 진행률 · touched files · remaining | pointer |
+| **Vector Index** | optional retrieval (Buy) | hit만 |
+| **Working Set** | — | **✅ 전부** |
 
-API LLM은 stateless — 매 요청 full history. **로컬 LLM은 Runtime이 옆에 있으므로 메모리 계층을 둔다.**
+### 3.2 Project Index Bootstrap
+
+프로젝트 최초(또는 stale) 1회 — **LLM 없이** pipeline scan:
 
 ```text
-GPU Context     = 작업 메모리 / L1 cache   ← 현재 turn working set만
-Runtime Memory  = RAM / DB / artifact store / session state
-Vector Memory   = 장기 검색 인덱스
-Prompt Pack     = LLM에 올릴 working set (선택 결과)
+directory tree · file hash · mtime · git commit · entrypoints · symbol hints
+        ↓
+project_fingerprint + index_version  →  invalidation
 ```
 
-```mermaid
-flowchart TB
-    IDE[User / IDE] --> RT[AI Runtime]
-    subgraph mem["Memory Hierarchy"]
-        SM[Session Memory]
-        AM[Artifact Memory]
-        VM[Vector Memory]
-        PM[Policy Memory]
-        WS[Working Set Builder]
-    end
-    RT --> mem
-    WS --> PACK[Prompt Pack]
-    PACK --> GPU[GPU Context / KV Cache]
-    GPU --> LLM[Local LLM]
+`runtime_kernel/project_index.py` · env `PROJECT_INDEX_BOOTSTRAP=1`
+
+### 3.3 Evidence Anchor (요약만 저장 금지)
+
+```text
+path · symbol · line_start-end · content_hash · summary · why_read · quality
 ```
 
-| 계층 | 저장 | GPU에 올리는가 |
-|------|------|----------------|
-| Session | 최근 대화 · task state | tail만 |
-| Artifact | file · tool result | 필요분만 |
-| Vector | retrieval index | 검색 hit만 |
-| Policy | failed action · ban | 요약만 |
-| **Working Set** | — | **최종 선별 결과** |
+`runtime_kernel/evidence_anchor.py`
 
-벤치: `python3 scripts/benchmark-memory-hierarchy.py --quality-gate` · `python3 scripts/benchmark-repeated-read-avoidance.py` · Inspector **Memory Hierarchy** funnel · Langfuse `memory.hierarchy.snapshot`
+### 3.4 Task Journal & Handoff
 
-**Quality gate (2026-06-18)**: 80K raw → **970~1,415 GPU tokens** (ratio ≤ 0.018), **coverage 1.00**, task/recovery **100%**, repeated-read **live 1.00 · stress 0.80**.
+```text
+Journal: read / edit / tool / failure / success / turn
+Handoff: touched files · evidence · remaining risks · journal tail
+Final report: Journal 기반 render → LLM은 polish만 (optional)
+```
 
-> AI Runtime은 로컬 LLM 주변에 Memory Hierarchy를 두고, GPU context에는 현재 작업에 필요한 working set만 올린다.
+`runtime_kernel/task_journal.py`
 
 ---
 
-## 2. Market Pain
+## 4. Runtime 구성요소
 
-### 2.1 Context 비용 (v1 — 1순위)
+### 4.1 코드 3계층 (2026-06 리셋)
 
-| 증상 | 원인 |
-|------|------|
-| API 청구서 폭증 | 매 요청 200K~600K history 재전송 |
-| Local LLM OOM | 32K ctx에 100K+ prompt |
-| 품질 저하 | truncate 후 “잘렸는지” 모름 |
+```text
+runtime_kernel/     Memory Scheduler — index · working set · journal · budget · coverage
+agent_brain/          AI Planner — RuntimeState → next action (Phase 2)
+observability/        Trace SSOT — turn_log primary
+reference/            Cursor agent POC — hard guard + tool exec (v2 경계 명시)
+```
 
-### 2.2 Agent 실행 (v2)
+### 4.2 Thinking vs Runtime
 
-Read/Grep 반복 · 조기 final · tool loop — `reference/` 모듈로 Cursor POC 검증 중.
+```text
+LLM:  need more info? → Read / Grep / Glob / Shell (스스로 결정)
+Runtime: tool 결과 → artifact · evidence anchor · journal 저장
+Runtime: hard guard만 — ping-pong · leak · premature final
+```
 
-### 2.3 GPU (v3 · Enterprise)
-
-VRAM · KV · multi-GPU — Enterprise가 먼저 지불.
+Tool은 LLM 사고의 **연장**이며, Runtime은 그 **기록·재사용**을 담당한다.
 
 ---
 
-## 3. Why Existing Solutions Fail
+## 5. Master Flow
 
-> **같은 계층끼리만 비교한다.** Coverage는 Proxy 기능이 아니다. Delta는 Memory DB가 아니다.
+### 5.1 Target (Memory Scheduler)
 
-| 계층 | 기존 (Buy) | 우리 (Build — Policy Layer) |
-|------|------------|----------------------------|
-| **Vector Retrieval** | LlamaIndex, Haystack | **Retrieval Budget Policy** — Need-aware rank · token ceiling |
-| **State Persistence** | LangGraph checkpointer, Letta store | **Context-aware Delta Compression** — history→delta→artifact scheduling |
-| **Memory Runtime** | LangGraph session graph | **Context-aware Memory Scheduling** — hot/cold · artifact priority |
-| **OpenAI Gateway** | LiteLLM, OpenRouter | **Runtime Policy Layer** — Need→Budget→Coverage→Recovery (gateway 위) |
-| **Inference Runtime** | vLLM, llama.cpp, Ollama | Adapter only — tensor 연산은 Buy |
-| **Tracing / Dashboard** | OpenTelemetry, Langfuse, LangSmith | Metric schema만 Build · export는 Buy |
-| **Runtime Scheduler** | *(직접 경쟁 없음)* | **Context Scheduler** — 핵심 IP |
+```text
+Cursor IN (full history — Router만 수신)
+    ↓
+Memory Ingest (delta · artifact · session)
+    ↓
+Project Index ensure (bootstrap if stale)
+    ↓
+Need Analysis (intent SSOT)
+    ↓
+Working Set Plan  ← hot path (P0)
+    ↓
+Retrieve (single pass, WS budget)
+    ↓
+Dynamic Budget + Pre-pack constraints
+    ↓
+Prompt Pack
+    ↓
+Coverage (+ Recovery)
+    ↓
+Local LLM (Thinking)
+    ↓
+Tool results → Memory · Journal
+```
 
-**직접 재개발 금지** — [INTEGRATIONS.md](./INTEGRATIONS.md).  
-**Build**: Context Scheduling · Coverage · Recovery · Budget Policy만.  
-**Buy**: Gateway · Vector engine · Checkpointer · Trace · Dashboard.
+### 5.2 이전 vs 현재
 
-IDE를 만들지 않는다. Runtime은 **플러그인 + 백그라운드 서비스** (Cursor · VSCode · JetBrains · CLI).
+| | 이전 (압축 프록시) | 현재 (목표) |
+|--|-------------------|-------------|
+| Working Set | 메트릭만 | **retrieve 전** hot path |
+| Retrieve | 2-pass | **1-pass** (WS budget) |
+| Coverage | prompt **후** 감사 only | pre-pack constraint + post audit |
+| Project map | 없음 | **Index bootstrap** |
+| Final | LLM 재추론 | **Journal render** |
 
-### Build vs Buy (요약)
-
-| 영역 | Build | Buy |
-|------|:-----:|:---:|
-| Vector engine | ❌ | LlamaIndex / Haystack |
-| Tracing export | ❌ | OpenTelemetry |
-| Prompt/provider cache | ❌ | Provider / vLLM |
-| Memory graph / checkpoint | ❌ | LangGraph |
-| OpenAI gateway | ❌ | LiteLLM |
-| Agent state machine | ❌ | LangGraph (v2) |
-| Dashboard UI | ❌ | Langfuse / Phoenix |
-| **Runtime Scheduler** | ✅ | — |
-| **Coverage Engine** | ✅ | — |
-| **Recovery Loop** | ✅ | — |
-| **Dynamic Budget Policy** | ✅ | — |
-| **Delta Context Policy** | ✅ | — |
+구현: `dynamic_context_scheduler.build_context_for_turn`
 
 ---
 
-## 4. Our Runtime — 한 장 요약
+## 6. Build vs Buy
 
-> 투자자·PM용 **3분 버전**. 상세 Flow · Sequence → [ARCHITECTURE.md](./ARCHITECTURE.md)
+| Build (IP) | Buy (Adapter) |
+|------------|---------------|
+| Memory Scheduler · Working Set · Project Index | llama.cpp / vLLM |
+| Task Journal · Evidence Anchor · Coverage · Recovery | LlamaIndex (optional) |
+| RuntimeState · Self Model | LiteLLM gateway (optional) |
+| | LangGraph checkpoint (optional) |
+| | OTel / Langfuse export |
 
-### 4.1 Problem → Answer (마스터 Flow)
-
-```mermaid
-flowchart TD
-    P[Problem: 100K+ context] --> RT[AI Runtime]
-    RT --> MEM[Memory Ingest · Tiering]
-    MEM --> NEED[Need Analysis]
-    NEED --> FETCH[Memory / Retrieval Fetch]
-    FETCH --> WS[Working Set Selection]
-    WS --> BUD[Dynamic Budget]
-    BUD --> COV[Coverage]
-    COV -->|fail| REC[Recovery]
-    REC --> RET
-    REC --> BUD
-    COV -->|pass| PROMPT[Prompt Pack]
-    PROMPT --> LLM[LLM]
-    LLM --> ANS[Answer / Next Tool]
-```
-
-```text
-Problem → Runtime → Memory → Need → Retrieve → Budget → Coverage → Recovery? → LLM → Answer
-```
-
-### 4.1b Runtime — 왜 각 단계가 있는가
-
-```text
-Need        → LLM이 이번 턴에 무엇이 필요한지 결정 (intent · coverage_targets)
-Retrieve    → 필요한 문서·코드·tool 결과만 수집 (vector engine = Buy)
-Measure     → retrieval 실측 token (추정이 아님)
-Allocate    → 32K context window 안에서 slot 재배치 (Dynamic Budget)
-Coverage    → truncate·symbol·must_include 검사 — “잘렸는지” 앎
-Recovery    → 부족하면 budget↑ · re-retrieve · prompt rebuild
-Prompt      → budget-aware pack (단순 template 아님)
-LLM         → Inference engine (Buy: llama.cpp · vLLM · API)
-```
-
-### 4.2 Runtime 내부 (Core IP + 우선순위)
-
-```text
-AI Runtime (Context Runtime v1)
-────────────────────────────────
-Message Index
-    ↓
-Memory Store (delta · artifact · session)
-    ↓
-Need Analysis (ContextNeed)
-    ↓
-Retriever (+ optional Vector)
-    ↓
-Dynamic Budget (measure → allocate)
-    ↓
-Coverage Check
-    ↓
-Recovery Loop
-    ↓
-Prompt Builder
-    ↓
-LLM
-    ↓
-Inspector / Turn Log          ★★☆☆☆  (metric schema Build · UI Buy)
-```
-
-| Core IP | 중요도 | Build/Buy |
-|---------|:------:|-----------|
-| Dynamic Budget | ★★★★★ | Build |
-| Coverage Engine | ★★★★★ | Build |
-| Recovery Loop | ★★★★★ | Build |
-| Need Analysis | ★★★★★ | Build |
-| Delta Context Policy | ★★★★☆ | Build (LangGraph 위 policy) |
-| Artifact Priority | ★★★★☆ | Build |
-| Message Index | ★★★☆☆ | Build |
-| Inspector metrics | ★★☆☆☆ | Build schema · Buy UI |
-
-### 4.2b Context Scheduler — Inputs / Outputs
-
-Scheduler는 “Budget” 라벨만으로는 설명되지 않는다. **입력·출력 계약**이 있다.
-
-```text
-Inputs                          Outputs (token budget per slot)
-────────────────────────        ────────────────────────────────
-Intent                          History      (session_tail + delta)
-Phase                           Retrieved
-Retrieved Tokens (measured)     Artifact
-Coverage Score / Complete       Memory       (state slot)
-GPU Backend                     Output Tokens
-Context Window (32K)            System · Plan · Current Task
-Max Output Tokens
-Recovery Round
-```
-
-구현: `runtime_core/scheduler_contract.py` · 오케스트레이션: `dynamic_context_scheduler.py`
-
-### 4.3 Dynamic Budget — 핵심 IP (왜 우리인가)
-
-Budget은 설정값이 아니라 **실행 정책**이다.
-
-```text
-Question
-    ↓
-Need Analysis        ← intent · coverage_targets · must_include
-    ↓
-Retriever            ← artifact + vector, 실측 token
-    ↓
-Measure              ← retrieval_total_tokens
-    ↓
-Allocate             ← allocate_dynamic (NOT static ratio)
-    ↓
-Coverage             ← symbol · truncation · evidence
-    ↓
-Recovery (if fail)   ← budget+ → re-retrieve → rebuild
-    ↓
-Prompt → LLM
-```
-
-Intent 예: **recall** → session_tail↑ · **bugfix** → retrieved↑ + `file.py::func` coverage
-
-### 4.4 Recovery Loop
-
-```mermaid
-flowchart LR
-    CF[Coverage Fail] --> BU[Budget +25%]
-    BU --> RR[Re-Retrieve]
-    RR --> RB[Prompt Rebuild]
-    RB --> CP{Coverage Pass?}
-    CP -->|No| CF
-    CP -->|Yes| FIN[Final Allowed]
-```
-
-E2E 검증: `scripts/benchmark-recovery-e2e.py` ✅
-
-### 4.5 Memory Layer
-
-```mermaid
-flowchart LR
-    H[Cursor History 100K+] --> IDX[Message Index]
-    IDX --> D[Delta]
-    D --> A[Artifact Store]
-    A --> PP[Prompt Pack ~0.6–10K]
-    PP --> LLM[LLM]
-```
-
-| 계층 | Hot | Cold |
-|------|-----|------|
-| 메시지 | delta tail | message_keys snapshot |
-| 컨텍스트 | incremental index | rebuild on mismatch |
-| 실패 tool | cold summary | failed_tool_summaries |
-
-### 4.6 Closed Loop (v1 + v2 reference)
-
-Context Runtime v1은 **Coverage → Recovery**까지. Agent judge는 v2 reference.
-
-```mermaid
-flowchart TD
-    Q[Question] --> N[Need]
-    N --> R[Retrieve]
-    R --> C[Coverage]
-    C -->|fail| REC[Recovery]
-    REC --> R
-    C -->|pass| PR[Prompt]
-    PR --> L[LLM]
-    L --> J[Judge · v2]
-    J --> E{Enough?}
-    E -->|No| N
-    E -->|Yes| F[Final]
-```
-
-전체 Sequence · 19단계 파이프라인 → [ARCHITECTURE.md §2–§6](./ARCHITECTURE.md)
+**직접 재개발 금지**: vector engine · inference · dashboard UI  
+**Build**: Memory가 무엇을 GPU에 올릴지 **결정하는 정책**
 
 ---
 
-## 5. 제품 정의
+## 7. 제품 · Roadmap
 
-> **AI Runtime** = Universal Middleware · **v1 SKU = Context Runtime**
+### 7.1 SKU
 
-| 버전 | SKU | Pain |
+| 버전 | SKU | 핵심 |
 |:----:|-----|------|
-| **v1** | **Context Runtime** | Context/API cost, OOM |
-| v2 | Agent Runtime | tool loop, evidence |
-| v3 | GPU Runtime | VRAM, KV |
-| v4 | Enterprise Runtime | on-prem, policy |
+| **v1** | **Memory Runtime** | Project Index · Working Set · Journal · Handoff |
+| v2 | Agent Brain | RuntimeState → AI Planner decision |
+| v3 | GPU Runtime | KV prefix policy · multi-GPU |
+| v4 | Enterprise | on-prem · policy console |
 
-```text
-백그라운드 Runtime (:8080, OpenAI-compatible)
-    ↑
-Cursor · Continue · CLI · JetBrains plugin
-```
-
----
-
-## 6. Architecture Snapshot
-
-### 6.0 Reference Architecture (한 장)
-
-> **우리는 IDE도 아니고 모델도 아니다. 그 사이의 Runtime Policy Layer.**
-
-```mermaid
-flowchart TB
-    subgraph apps["Applications"]
-        C[Cursor]
-        CC[Claude Code]
-        CO[Continue]
-        JB[JetBrains]
-        CLI[CLI Agent]
-    end
-    subgraph rt["AI Runtime — Policy Layer (Build)"]
-        direction TB
-        NEED[ContextNeed]
-        BUD[Dynamic Budget]
-        COV[Coverage]
-        REC[Recovery]
-    end
-    subgraph adapters["Adapters (Buy)"]
-        LG[LangGraph checkpoint]
-        LI[LlamaIndex retrieval]
-        OT[OpenTelemetry]
-        LF[Langfuse]
-        GW[LiteLLM gateway]
-    end
-    subgraph engines["Inference Engines (Buy)"]
-        OAI[OpenAI · Anthropic]
-        VLLM[vLLM · Ollama]
-        LLM[llama.cpp · TensorRT]
-    end
-    apps --> rt
-    rt --> adapters
-    adapters --> engines
-    engines --> GPU[GPU]
-```
-
-```text
-IDE / Agent  →  Runtime Policy  →  Adapters  →  LLM Engine  →  GPU
-(Build)          (Build)            (Buy)         (Buy)
-```
-
-코드 구조: `runtime_core/` (Build) · `adapters/` (Buy) · `legacy/` (POC shim) · `reference/` (Cursor v2)
-
-### 6.1 네 계층
-
-```mermaid
-flowchart TB
-    IDE[Application] --> RT[AI Runtime]
-    RT --> ENG[Inference Engine]
-    ENG --> HW[Hardware]
-```
-
-### 6.2 Module Map (간략)
-
-```text
-runtime_core/     ContextNeed · Budget · Coverage · Recovery · Scheduler contract  (Build)
-adapters/         memory · retrieval · gateway · trace · langgraph · mcp         (Buy glue)
-legacy/           POC backend — memory_store · retriever · agent_runs (adapter만 접근)
-reference/        v2 Agent POC
-integrations/     llamaindex · otel · langfuse
-```
-
-**Import 규칙**: app 코드 → `adapters/` · engine/backend → `legacy/` · Core IP → flat + `runtime_core/`
-
-상세 모듈表 → [ARCHITECTURE.md §7](./ARCHITECTURE.md) · [MODULE_MAP.md](./MODULE_MAP.md)
-
----
-
-## 7. Benchmark Snapshot
-
-### 7.1 Context 압축 Funnel
-
-```mermaid
-flowchart LR
-    C[Cursor 103K] --> RT[Runtime ~10K]
-    RT --> DYN[Dynamic Pack ~3K]
-    DYN --> OUT[LLM effective ~0.6–2K]
-```
-
-### 7.2 Runtime Success
-
-```mermaid
-flowchart LR
-    N[Naive 79%] --> M[Memory proxy]
-    M --> P1[P1 + judge]
-    P1 --> OK[100% 20 tasks]
-```
-
-| 지표 | Before | After (p1) |
-|------|:------:|:------------:|
-| Context | 103K | **~10K (−90%)** |
-| Runtime success | 79% | **100%** |
-| Tool calls / task | 3.03 | **0.6** |
-| Recovery E2E | — | **pass** |
-
-전체 표 · 그래프 · 재현 → [BENCHMARK.md](./BENCHMARK.md)
-
-```bash
-python3 scripts/benchmark-dynamic-budget-matrix.py   # 25 cases
-python3 scripts/benchmark-recovery-e2e.py
-bash scripts/run-vector-e2e.sh                       # 115 artifacts
-```
-
----
-
-## 8. Business
-
-### 8.1 누가 돈을 내는가
-
-| 세그먼트 | SKU |
-|----------|-----|
-| API 팀 (GPT/Claude) | v1 Context Runtime |
-| Local LLM 사용자 | v1 |
-| Agent 팀 | v2 |
-| Enterprise GPU farm | v3–v4 |
-
-### 8.2 경쟁 (같은 계층)
-
-| | Context Policy | Runtime Scheduler | Coverage/Recovery |
-|--|:--------------:|:-----------------:|:-----------------:|
-| Cursor (built-in) | △ | ❌ | ❌ |
-| LiteLLM (gateway) | ❌ | ❌ | ❌ |
-| LlamaIndex (retrieval) | △ rank only | ❌ | △ |
-| LangGraph (agent graph) | △ state | ❌ | △ |
-| **AI Runtime v1** | ✅ | ✅ | ✅ |
-
----
-
-## 9. Roadmap
-
-### 9.1 Product SKU
-
-```mermaid
-flowchart LR
-    V1[v1 Context Runtime] --> V2[v2 Agent Runtime]
-    V2 --> V3[v3 GPU Runtime]
-    V3 --> V4[v4 Enterprise]
-```
-
-### 9.2 Go-to-Market
-
-```mermaid
-flowchart LR
-    PL[Plugin / Middleware] --> SDK[Runtime SDK]
-    SDK --> CL[Cloud Runtime]
-    CL --> ENT[Enterprise]
-```
+### 7.2 GTM
 
 | 단계 | 산출물 |
 |------|--------|
-| **지금** | Cursor middleware + OpenAI API |
-| Plugin | VSCode · JetBrains · CLI daemon |
-| SDK | `@cursor/sdk` style runtime client |
-| Cloud | hosted context policy |
-| Enterprise | on-prem · SSO · policy console |
+| **지금** | Cursor reference + OpenAI-compatible `:8080` |
+| Next | CLI daemon · VSCode/JetBrains plugin |
+| Later | Runtime SDK · hosted policy |
 
-### 9.3 v1 엔지니어링 상태
+### 7.3 엔지니어링 우선순위
 
-| Core IP | 상태 |
-|---------|:----:|
-| Dynamic Budget + ContextNeed | ✅ |
-| Coverage + Recovery E2E | ✅ |
-| Vector retrieval E2E (115 artifacts) | ✅ |
-| Inspector + OTel flow | ✅ |
-| Agent layer (reference/) | ▶ v2 분리 |
+| P | 항목 | 상태 |
+|:-:|------|:----:|
+| P0 | Project Index Bootstrap | ✅ |
+| P0 | Working Set hot path | ✅ |
+| P0 | Task Journal / Handoff | ✅ |
+| P0 | Intent / Phase SSOT | ✅ |
+| P1 | AI Planner = decision authority | ⬜ Phase 2 |
+| P1 | Memory summarization loop | ⬜ Phase 3 |
+| P1 | reference/ v2 hot path 분리 | ⬜ |
+| P2 | Final Report Renderer (journal-first) | ⬜ |
+
+---
+
+## 8. Benchmark Snapshot
+
+Context **압축**은 부수 효과:
+
+| 지표 | Before | After (p1) |
+|------|:------:|:------------:|
+| Cursor proxy | 103K | ~10K (−90%) |
+| Memory hierarchy ratio | — | ≤0.018 (gate) |
+| Recovery E2E | — | pass |
+
+전체 → [BENCHMARK.md](./BENCHMARK.md)
+
+```bash
+python3 scripts/benchmark-memory-hierarchy.py --quality-gate
+python3 scripts/benchmark-recovery-e2e.py
+```
 
 ---
 
@@ -535,12 +299,8 @@ flowchart LR
 
 | 문서 | 역할 |
 |------|------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | **기술 심화** — Flow, Closed Loop, Sequence |
-| [BENCHMARK.md](./BENCHMARK.md) | **객관 근거** — 변천사, 그래프 |
-| [MODULE_MAP.md](./MODULE_MAP.md) | 코드 계층 |
-| [INTEGRATIONS.md](./INTEGRATIONS.md) | Build vs Buy |
-| [archive/VISION-os-era-2026-06.md](./archive/VISION-os-era-2026-06.md) | OS-era 아카이브 |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | 기술 Flow · Audit §12 |
+| [REFACTOR.md](./REFACTOR.md) | 3-tier 리셋 계획 |
+| [MODULE_MAP.md](./MODULE_MAP.md) | 코드 tier |
 
----
-
-*Last updated: 2026-06-18 — Build vs Buy layer alignment · Scheduler I/O · Reference Architecture*
+*Last updated: 2026-06-22 — Local LLM Runtime philosophy · Memory Scheduler · Working Set hot path*

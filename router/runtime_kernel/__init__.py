@@ -26,7 +26,10 @@ from .constants import (
 from .intent import RuntimeIntentResolution, resolve_runtime_intent
 from .phase import FINAL_PHASES, RuntimePhase
 from .runtime_state import RuntimeState, build_runtime_state, persist_runtime_state
-from .self_model import format_self_model_block, load_self_model
+from .evidence_anchor import EvidenceAnchor, content_hash, upsert_anchor
+from .project_index import ProjectIndex, bootstrap_project_index, ensure_project_index
+from .task_journal import append_journal, build_handoff, record_turn_journal, render_handoff_markdown
+from .working_set import TurnWorkingSet, apply_pre_pack_constraints, apply_working_set_to_budget, plan_working_set
 
 __all__ = [
     "AGENT_FAST_FORBIDDEN",
@@ -57,4 +60,16 @@ __all__ = [
     "load_self_model",
     "persist_runtime_state",
     "resolve_runtime_intent",
+    "ProjectIndex",
+    "ensure_project_index",
+    "bootstrap_project_index",
+    "TurnWorkingSet",
+    "plan_working_set",
+    "apply_working_set_to_budget",
+    "apply_pre_pack_constraints",
+    "EvidenceAnchor",
+    "upsert_anchor",
+    "build_handoff",
+    "record_turn_journal",
+    "render_handoff_markdown",
 ]

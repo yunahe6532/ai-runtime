@@ -145,6 +145,11 @@ class SessionState:
     last_memory_hierarchy: dict[str, Any] = field(default_factory=dict)
     last_raw_tokens: int = 0
     runtime_state: dict[str, Any] = field(default_factory=dict)
+    project_index: dict[str, Any] = field(default_factory=dict)
+    task_journal: list[dict[str, Any]] = field(default_factory=list)
+    handoff: dict[str, Any] = field(default_factory=dict)
+    evidence_anchors: list[dict[str, Any]] = field(default_factory=list)
+    last_working_set: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

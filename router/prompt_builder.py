@@ -899,6 +899,25 @@ def build_with_budget(
     else:
         sys_content = _compact_system(body, intent_name, phase or "tool_planning", budget_plan.system)
     extras = []
+    try:
+        from runtime_kernel.self_model import format_self_model_block
+
+        sm = format_self_model_block(max_chars=900)
+        if sm:
+            extras.append(sm)
+    except ImportError:
+        pass
+    if getattr(state, "handoff", None) and phase in ("final_answer", "partial_final_answer", "recovery_final"):
+        try:
+            from runtime_kernel.task_journal import render_handoff_markdown
+
+            handoff_md = render_handoff_markdown(state.handoff)
+            if handoff_md:
+                extras.append(
+                    _truncate_with_marker(handoff_md, budget_plan.state, source="handoff", markers=markers)
+                )
+        except ImportError:
+            pass
     if must_include_block:
         extras.append(must_include_block)
     if plan_text:

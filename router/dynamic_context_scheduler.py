@@ -1,4 +1,8 @@
-"""Dynamic context scheduler — Need → Retrieve → Budget → Prompt → Coverage → Recovery."""
+"""Dynamic context scheduler — Memory Scheduler hot path.
+
+Target flow (Local LLM Runtime):
+  Need → Project Index → Working Set Plan → Retrieve → Budget → Pre-pack → Prompt → Coverage → Recovery
+"""
 
 from __future__ import annotations
 
@@ -32,6 +36,13 @@ from runtime_core.runtime_events import (
     event_turn_start,
 )
 from runtime_core.scheduler_contract import SchedulerInputs, SchedulerOutputs
+from runtime_kernel.project_index import ensure_project_index
+from runtime_kernel.task_journal import build_handoff, record_turn_journal
+from runtime_kernel.working_set import (
+    apply_pre_pack_constraints,
+    apply_working_set_to_budget,
+    plan_working_set,
+)
 from runtime_turn_log import record_runtime_turn
 
 LOG = logging.getLogger("router.dynamic_context_scheduler")
@@ -39,6 +50,7 @@ LOG = logging.getLogger("router.dynamic_context_scheduler")
 DYNAMIC_BUDGET = os.getenv("DYNAMIC_BUDGET", "1") == "1"
 COVERAGE_CHECK = os.getenv("COVERAGE_CHECK", "1") == "1"
 RECOVERY_ENABLED = os.getenv("RECOVERY_ENABLED", "1") == "1"
+PROJECT_INDEX_BOOTSTRAP = os.getenv("PROJECT_INDEX_BOOTSTRAP", "1") == "1"
 
 
 def _trace_ctx(state: SessionState, *, intent: str, phase: str, backend: str) -> dict[str, Any]:
@@ -116,7 +128,7 @@ def build_context_for_turn(
     index: Any,
     query: str = "",
 ) -> Any:
-    """Orchestrate retrieval-first dynamic budget for one turn."""
+    """Memory Scheduler — working set before prompt pack."""
     from context_cache import ContextIndex
     from prompt_builder import (
         TOOL_PLANNING_MAX_TOKENS,
@@ -142,6 +154,14 @@ def build_context_for_turn(
     tctx = _trace_ctx(state, intent=intent_name, phase=phase, backend=backend)
     emit_runtime_event(event_turn_start(**tctx))
 
+    workspace = getattr(state, "effective_workspace", "") or getattr(state, "workspace_path", "")
+    project_index = None
+    if PROJECT_INDEX_BOOTSTRAP:
+        try:
+            project_index = ensure_project_index(state, workspace)
+        except Exception as exc:
+            LOG.warning("project_index bootstrap skipped: %s", exc)
+
     agent_plan = ensure_agent_plan(state, query)
     need = extract_context_need(agent_plan, query, intent_name, phase)
     agent_plan.context_need = need.to_dict()
@@ -155,11 +175,17 @@ def build_context_for_turn(
         )
     )
 
+    ws = plan_working_set(
+        need, state, backend=backend, phase=phase, max_output=max_out, project_index=project_index,
+    )
+    state.last_working_set = ws.to_dict()
+
     pre_budget = allocate_static(backend, phase, max_out)
-    preliminary_tokens = max(pre_budget.retrieved, 2048)
+    retrieval_budget = max(ws.retrieved_token_cap, pre_budget.retrieved)
+
     t_ret0 = time.perf_counter()
     retrieval_pack = retrieve_for_need(
-        state, query, delta, need, preliminary_tokens, phase=phase,
+        state, query, delta, need, retrieval_budget, phase=phase,
     )
     emit_runtime_event(
         event_retrieval_completed(
@@ -185,6 +211,9 @@ def build_context_for_turn(
         if DYNAMIC_BUDGET
         else allocate_static(backend, phase, max_out)
     )
+    budget = apply_working_set_to_budget(budget, ws)
+    budget = apply_pre_pack_constraints(need, budget, ws)
+
     scheduler_outputs = SchedulerOutputs.from_budget_plan(budget)
     state.last_scheduler_inputs = scheduler_inputs.to_dict()
     state.last_scheduler_outputs = scheduler_outputs.to_dict()
@@ -199,27 +228,6 @@ def build_context_for_turn(
             **tctx,
         )
     )
-
-    evidence_retrieval_budget = budget.retrieved
-    if phase in ("final_answer", "partial_final_answer", "recovery_final"):
-        from prompt_builder import _final_answer_evidence_budget
-
-        evidence_retrieval_budget = _final_answer_evidence_budget(budget)
-
-    t_ret1 = time.perf_counter()
-    retrieval_pack = retrieve_for_need(
-        state, query, delta, need, evidence_retrieval_budget, phase=phase,
-    )
-    emit_runtime_event(
-        event_retrieval_completed(
-            retrieval_backend=_retrieval_backend_label(),
-            retrieved_count=len(getattr(retrieval_pack, "items", None) or []),
-            retrieved_tokens=int(getattr(retrieval_pack, "total_tokens", 0) or 0),
-            latency_ms=(time.perf_counter() - t_ret1) * 1000.0,
-            **tctx,
-        )
-    )
-    stats = RetrievalStats.from_pack(retrieval_pack)
 
     pack = build_with_budget(
         body=body,
@@ -260,12 +268,12 @@ def build_context_for_turn(
     prompt_tokens = _prompt_token_total(pack)
     ratio = (prompt_tokens / raw_proxy_tokens) if raw_proxy_tokens > 0 else 0.0
     sources = getattr(pack, "prompt_sources", None) or {}
-    prompt_source = ",".join(sorted(sources.keys())[:4]) if isinstance(sources, dict) else "dynamic_budget"
+    prompt_source = ",".join(sorted(sources.keys())[:4]) if isinstance(sources, dict) else "working_set"
     emit_runtime_event(
         event_prompt_built(
             prompt_tokens=prompt_tokens,
             compression_ratio=ratio,
-            prompt_source=prompt_source or "dynamic_budget",
+            prompt_source=prompt_source or "working_set",
             **tctx,
         )
     )
@@ -276,6 +284,7 @@ def build_context_for_turn(
         retrieval_pack=retrieval_pack,
         coverage=coverage,
         prompt_pack=pack,
+        working_set=ws.plan,
     )
     emit_runtime_event(
         event_memory_hierarchy_snapshot(
@@ -356,15 +365,23 @@ def build_context_for_turn(
             coverage = recovery.coverage or coverage
             pack.coverage = coverage
 
+    record_turn_journal(
+        state,
+        query=query,
+        phase=phase,
+        intent=intent_name,
+        files_read=list(getattr(state, "files_read", None) or []),
+    )
+    if phase in ("final_answer", "partial_final_answer", "recovery_final"):
+        build_handoff(state, query=query)
+
     LOG.info(
-        "turn_summary phase=%s intent=%s coverage=%.2f complete=%s missing=%s recovery=%s rounds=%d pack_tokens=%d",
+        "turn_summary phase=%s intent=%s coverage=%.2f complete=%s ws_targets=%d pack_tokens=%d",
         phase,
         intent_name,
         float(getattr(coverage, "coverage_score", 0) or 0),
         bool(getattr(coverage, "complete", False)),
-        (getattr(coverage, "missing", None) or [])[:4],
-        recovery_recovered if recovery_triggered else "skipped",
-        recovery_rounds,
+        len(ws.priority_targets),
         _prompt_token_total(pack),
     )
 

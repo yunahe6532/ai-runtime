@@ -93,26 +93,26 @@ Recovery Round
 
 ## 2. Runtime Flow — Master Pipeline
 
-### 2.1 End-to-end (Context Runtime v1)
+### 2.1 End-to-end (Memory Runtime v1)
 
 ```mermaid
 flowchart TD
-    IN[Cursor IN full history] --> IDX[message_index]
-    IDX --> MS[memory_store delta artifact]
-    MS --> NEED[ContextNeed extract]
-    NEED --> RET[retrieve_for_need]
-    RET --> MEAS[Measure retrieval tokens]
-    MEAS --> BUD[allocate_dynamic]
-    BUD --> BUILD[build_with_budget]
-    BUILD --> COV[check_coverage]
-    COV -->|complete| LLM[llama-long]
-    COV -->|fail| REC[recovery_scheduler]
+    IN[Cursor IN full history] --> ING[Memory Ingest delta artifact]
+    ING --> IDX[Project Index ensure]
+    IDX --> NEED[ContextNeed SSOT]
+    NEED --> WS[Working Set Plan]
+    WS --> RET[Retrieve single pass]
+    RET --> BUD[Dynamic Budget + Pre-pack]
+    BUD --> BUILD[Prompt Pack]
+    BUILD --> COV[Coverage]
+    COV -->|fail| REC[Recovery]
     REC --> RET
-    REC --> BUD
-    REC --> BUILD
-    LLM --> LOG[runtime_turn_log + OTel]
-    LOG --> OUT[Cursor OUT]
+    COV -->|pass| LLM[Local LLM Thinking]
+    LLM --> JOUR[Task Journal + Evidence]
+    JOUR --> OUT[Cursor OUT]
 ```
+
+> **변경 (2026-06-22)**: Working Set이 retrieve **이전** hot path. Retrieve 2-pass → 1-pass. Coverage = pre-pack constraint + post audit.
 
 ### 2.2 19단계 (운영 파이프라인)
 
