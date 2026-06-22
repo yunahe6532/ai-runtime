@@ -27,8 +27,34 @@ from .intent import RuntimeIntentResolution, resolve_runtime_intent
 from .phase import FINAL_PHASES, RuntimePhase
 from .runtime_state import RuntimeState, build_runtime_state, persist_runtime_state
 from .evidence_anchor import EvidenceAnchor, content_hash, upsert_anchor
+from .evidence_ingest import ingest_artifacts_evidence
+from .final_report import polish_optional, render_final_report, render_final_report_for_prompt
+from .memory_limits import (
+    MAX_ANCHOR_SUMMARY_CHARS,
+    MAX_ANCHORS_PER_FILE,
+    MAX_ANCHORS_TOTAL,
+    MAX_HANDOFF_CHARS,
+    MAX_JOURNAL_EVENTS,
+    cap_handoff_dict,
+    prune_anchors,
+    prune_journal,
+    truncate_summary,
+)
 from .project_index import ProjectIndex, bootstrap_project_index, ensure_project_index
-from .task_journal import append_journal, build_handoff, record_turn_journal, render_handoff_markdown
+from .task_journal import (
+    JournalKind,
+    append_journal,
+    build_handoff,
+    record_edit,
+    record_failure,
+    record_grep,
+    record_read,
+    record_shell,
+    record_success,
+    record_tool,
+    record_turn_journal,
+    render_handoff_markdown,
+)
 from .working_set import TurnWorkingSet, apply_pre_pack_constraints, apply_working_set_to_budget, plan_working_set
 
 __all__ = [
@@ -69,7 +95,28 @@ __all__ = [
     "apply_pre_pack_constraints",
     "EvidenceAnchor",
     "upsert_anchor",
+    "ingest_artifacts_evidence",
+    "JournalKind",
+    "record_read",
+    "record_grep",
+    "record_edit",
+    "record_shell",
+    "record_tool",
+    "record_failure",
+    "record_success",
     "build_handoff",
     "record_turn_journal",
     "render_handoff_markdown",
+    "render_final_report",
+    "render_final_report_for_prompt",
+    "polish_optional",
+    "MAX_JOURNAL_EVENTS",
+    "MAX_ANCHORS_TOTAL",
+    "MAX_ANCHORS_PER_FILE",
+    "MAX_ANCHOR_SUMMARY_CHARS",
+    "MAX_HANDOFF_CHARS",
+    "prune_journal",
+    "prune_anchors",
+    "cap_handoff_dict",
+    "truncate_summary",
 ]

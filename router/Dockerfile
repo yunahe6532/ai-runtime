@@ -10,6 +10,9 @@ RUN pip install --no-cache-dir \
 
 COPY main.py capture.py chat_fast.py context_cache.py intent_router.py cursor_reasoning.py runtime_inspector.py vl_pass.py prompt_builder.py context_budget.py context_need.py artifact_analyzer.py artifact_excerpt.py explorer_trace.py qwen_request.py message_index.py failed_action.py coverage_checker.py recovery_scheduler.py dynamic_context_scheduler.py runtime_turn_log.py /app/
 COPY runtime_core/ /app/runtime_core/
+COPY runtime_kernel/ /app/runtime_kernel/
+COPY agent_brain/ /app/agent_brain/
+COPY observability/ /app/observability/
 COPY reference/ /app/reference/
 COPY integrations/ /app/integrations/
 COPY legacy/ /app/legacy/

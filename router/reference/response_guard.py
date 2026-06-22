@@ -252,6 +252,26 @@ def _evidence_collected(session_state: Any | None, plan: Any | None) -> list[str
     return []
 
 
+def _mark_final_report_used(
+    session_state: Any,
+    *,
+    used: bool,
+    reason: str,
+    chars: int,
+) -> None:
+    rt = dict(getattr(session_state, "last_runtime_turn", None) or {})
+    rt["final_report_used"] = used
+    rt["final_report_reason"] = reason
+    rt["final_report_chars"] = chars
+    session_state.last_runtime_turn = rt
+    LOG.info(
+        "final_report_used=%s reason=%s chars=%d",
+        str(used).lower(),
+        reason or "n/a",
+        chars,
+    )
+
+
 def build_partial_final_prose(
     query: str,
     *,
@@ -260,6 +280,35 @@ def build_partial_final_prose(
     reason: str = "",
 ) -> str:
     """Deterministic prose when the agent loop must stop with partial evidence."""
+    if session_state is not None:
+        try:
+            from runtime_kernel.final_report import render_final_report
+
+            report = render_final_report(session_state, query=query)
+            if report and len(report.strip()) > 200:
+                _mark_final_report_used(session_state, used=True, reason=reason, chars=len(report))
+                prefix = ""
+                if reason == "bad_ping_pong":
+                    prefix = (
+                        "현재 탐색 루프가 반복되어 추가 도구 호출을 중단했습니다. "
+                        "확보된 근거 기준으로 요약합니다.\n\n"
+                    )
+                elif reason == "xml_parse_failure":
+                    prefix = (
+                        "모델이 도구 호출 형식으로 응답했지만 파싱에 실패했습니다. "
+                        "수집된 evidence 기준으로 부분 답변을 제공합니다.\n\n"
+                    )
+                elif reason in ("empty_outgoing", "explorer_checklist_complete"):
+                    prefix = (
+                        "탐색 checklist가 완료되어 수집된 근거 기준으로 답변합니다.\n\n"
+                    )
+                elif reason:
+                    prefix = "요청 처리 중 도구 루프를 종료하고 확보된 근거로 답변합니다.\n\n"
+                return (prefix + report).strip()
+            _mark_final_report_used(session_state, used=False, reason=reason, chars=len(report or ""))
+        except Exception as exc:
+            _mark_final_report_used(session_state, used=False, reason=f"error:{exc}", chars=0)
+
     lines: list[str] = []
     if reason == "bad_ping_pong":
         lines.append(

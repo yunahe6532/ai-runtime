@@ -1182,6 +1182,22 @@ def update_state_from_delta(
     )
 
     try:
+        from runtime_kernel.evidence_ingest import ingest_artifacts_evidence
+        from runtime_kernel.task_journal import build_handoff
+
+        q = query or state.current_query
+        ingest_artifacts_evidence(
+            state,
+            artifacts,
+            delta=delta,
+            messages=messages if isinstance(messages, list) else None,
+            query=q,
+        )
+        build_handoff(state, query=q)
+    except Exception as exc:
+        LOG.warning("evidence anchor ingest failed: %s", exc)
+
+    try:
         from reference.loop_guard import record_turn_progress, snapshot_progress
 
         after = snapshot_progress(state)

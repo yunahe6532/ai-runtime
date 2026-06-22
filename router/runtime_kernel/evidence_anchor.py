@@ -6,6 +6,8 @@ import hashlib
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .memory_limits import prune_anchors, truncate_summary
+
 
 @dataclass
 class EvidenceAnchor:
@@ -46,14 +48,14 @@ def upsert_anchor(state: Any, anchor: EvidenceAnchor | dict[str, Any]) -> None:
     a = anchor if isinstance(anchor, EvidenceAnchor) else EvidenceAnchor.from_dict(anchor)
     if not a:
         return
+    a.summary = truncate_summary(a.summary)
     key = a.anchor_key
     kept = [x for x in anchors if isinstance(x, dict) and x.get("anchor_key") != key]
     d = a.to_dict()
     d["anchor_key"] = key
+    d["summary"] = truncate_summary(str(d.get("summary") or ""))
     kept.append(d)
-    if len(kept) > 300:
-        kept = kept[-300:]
-    state.evidence_anchors = kept
+    state.evidence_anchors = prune_anchors(kept)
 
 
 def anchors_for_path(state: Any, path: str) -> list[dict[str, Any]]:

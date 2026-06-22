@@ -316,6 +316,31 @@ def _build_memory_snapshot(ap: dict[str, Any], state: Any | None) -> list[str]:
         lines.append(f"  Requests: {getattr(state, 'total_requests', 0)}")
         lines.append(f"  Artifacts: {len(getattr(state, 'artifacts', None) or [])}")
         lines.append(f"  Files read: {len(getattr(state, 'files_read', None) or [])}")
+        journal = list(getattr(state, "task_journal", None) or [])
+        anchors = list(getattr(state, "evidence_anchors", None) or [])
+        handoff = dict(getattr(state, "handoff", None) or {})
+        lines.append(f"  Journal events: {len(journal)}")
+        lines.append(f"  Evidence anchors: {len(anchors)}")
+        if handoff.get("updated_at"):
+            lines.append(f"  Handoff: {handoff.get('updated_at')}")
+        rt = dict(getattr(state, "last_runtime_turn", None) or {})
+        if "final_report_used" in rt:
+            lines.append(
+                f"  Final report: used={rt.get('final_report_used')} "
+                f"chars={rt.get('final_report_chars', 0)}"
+            )
+        for j in journal[-3:]:
+            if isinstance(j, dict):
+                lines.append(
+                    f"    · [{j.get('kind', '?')}] {str(j.get('target', ''))[:60]}"
+                )
+        for a in anchors[-3:]:
+            if isinstance(a, dict):
+                loc = str(a.get("path") or "")
+                ls = a.get("line_start")
+                if ls:
+                    loc += f":L{ls}"
+                lines.append(f"    · anchor {loc[:70]}")
     return lines
 
 
