@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.venv-*/
+*.egg
+
+# Runtime data
+tmp/
+*.ndjson
+.env
+.env.*
+
+# Models / large assets
+*.gguf
+models/
+
+# IDE
+.cursor/
+.vscode/
+
+# Node
+node_modules/
+scripts/pdf-export/node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Langfuse / docker volumes (if local)
+langfuse-data/

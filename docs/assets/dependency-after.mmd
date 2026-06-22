@@ -1,0 +1,44 @@
+flowchart TB
+  subgraph app["App / Orchestration"]
+    MAIN[main.py]
+    IR[intent_router.py]
+    DCS[dynamic_context_scheduler.py]
+    PB[prompt_builder.py]
+  end
+
+  subgraph adapters["adapters.* — public I/O surface"]
+    direction TB
+    ADAPT["gateway, langgraph, mcp, memory, observe, retrieval, trace"]
+  end
+
+  subgraph core["runtime_core.* — pure policy"]
+    direction TB
+    CORE["evidence_cluster, evidence_keys, indexing_helpers, memory_hierarchy, memory_policy, prompt_enforcer, runtime_events, scheduler_contract"]
+  end
+
+  subgraph legacy["legacy.* — swappable implementations"]
+    LEG["memory_store · retriever · agent_runs"]
+  end
+
+  subgraph integ["integrations.* — OTel · Langfuse · LlamaIndex"]
+    INT["otel · langfuse · flow_tracing · llamaindex"]
+  end
+
+  subgraph backend["Inference backends — Buy"]
+    LLM[llama.cpp · LiteLLM]
+  end
+
+  MAIN -->|"gateway · trace · observe"| ADAPT
+  IR -->|"memory ingest"| ADAPT
+  DCS -->|"memory · retrieval · policy"| ADAPT
+  DCS --> CORE
+  PB --> CORE
+  ADAPT --> LEG
+  ADAPT --> INT
+  ADAPT -->|"chat_completion"| LLM
+  INT --> LF[Langfuse / OTLP]
+
+  classDef build fill:#efe,stroke:#393
+  classDef buy fill:#eef,stroke:#339
+  class ADAPT,CORE build
+  class LEG,INT,LLM,LF buy

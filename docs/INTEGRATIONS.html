@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>INTEGRATIONS</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-light.min.css" id="gh-md-light" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-dark.min.css" id="gh-md-dark" disabled />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fff;
+      color-scheme: light;
+    }
+    html[data-theme="dark"] body { background: #0d1117; color-scheme: dark; }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.55rem 1.25rem;
+      border-bottom: 1px solid #d0d7de;
+      background: #f6f8fa;
+      font-size: 0.875rem;
+    }
+    html[data-theme="dark"] .toolbar {
+      border-color: #30363d; background: #161b22; color: #e6edf3;
+    }
+    .toolbar button {
+      font: inherit; cursor: pointer;
+      border: 1px solid #d0d7de; background: #fff;
+      border-radius: 6px; padding: 0.2rem 0.55rem;
+    }
+    html[data-theme="dark"] .toolbar button {
+      border-color: #30363d; background: #21262d; color: #e6edf3;
+    }
+    .toolbar a { color: inherit; opacity: 0.65; text-decoration: none; }
+
+    .page { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    .markdown-body { min-width: 0; }
+
+    /* Cursor MD preview 스타일 Mermaid 카드 */
+    .markdown-body .mermaid-wrap {
+      margin: 0.85rem 0 1.25rem;
+      padding: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    html[data-theme="dark"] .markdown-body .mermaid-wrap {
+      border-color: #30363d; background: #161b22;
+    }
+    .markdown-body pre.mermaid {
+      margin: 0; padding: 0; background: transparent; border: 0;
+      font-family: inherit; text-align: center;
+    }
+    /* Mermaid가 그린 SVG — IDE처럼 컨테이너에 맞춤 (축소 눌림 없음) */
+    .markdown-body .mermaid-wrap svg {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .doc-meta {
+      margin-top: 2rem; padding-top: 1rem;
+      border-top: 1px solid #d0d7de;
+      font-size: 0.8rem; opacity: 0.6;
+    }
+    html[data-theme="dark"] .doc-meta { border-color: #30363d; }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <strong>INTEGRATIONS</strong>
+    <span>2026-06-21 · Mermaid 0개</span>
+    <div>
+      <button type="button" id="theme-toggle">🌓</button>
+      <a href="#top">↑</a>
+    </div>
+  </header>
+  <div class="page" id="top">
+    <article class="markdown-body">
+<h1 id="integrations-build-vs-buy">Integrations — Build vs Buy</h1>
+<blockquote>
+<p><strong>원칙</strong>: 프레임워크를 새로 만드는 게 아니라, <strong>기존 프레임워크 위에서 Context Scheduling Policy를 파는 것.</strong><br><strong>Build</strong> = <code>runtime_core/</code> · <strong>Buy glue</strong> = <code>adapters/</code> · <strong>POC legacy</strong> = <code>legacy/</code> (격리 · 점진 이전)</p>
+</blockquote>
+<hr>
+<h2 id="layer별-build-vs-buy">Layer별 Build vs Buy</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th align="center">Build?</th>
+<th>Buy (Adapter)</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>OpenAI Gateway</td>
+<td align="center">❌</td>
+<td>LiteLLM</td>
+<td>provider routing · spend tracking 존재</td>
+</tr>
+<tr>
+<td>Provider Routing</td>
+<td align="center">❌</td>
+<td>LiteLLM / OpenRouter</td>
+<td>재발명 금지</td>
+</tr>
+<tr>
+<td>Agent State Graph</td>
+<td align="center">❌</td>
+<td>LangGraph</td>
+<td>v2 reference only</td>
+</tr>
+<tr>
+<td>Session Checkpoint</td>
+<td align="center">❌</td>
+<td>LangGraph checkpointer</td>
+<td>persistence Buy · delta policy Build</td>
+</tr>
+<tr>
+<td>Vector Retrieval Engine</td>
+<td align="center">❌</td>
+<td>LlamaIndex / Haystack</td>
+<td>ingestion · hybrid search Buy</td>
+</tr>
+<tr>
+<td>Observability Export</td>
+<td align="center">❌</td>
+<td>OpenTelemetry</td>
+<td>trace 표준</td>
+</tr>
+<tr>
+<td>Dashboard UI</td>
+<td align="center">❌</td>
+<td>Langfuse / Phoenix</td>
+<td>UI Buy · metric schema Build</td>
+</tr>
+<tr>
+<td>Prompt/Provider Cache</td>
+<td align="center">❌</td>
+<td>Provider / vLLM prefix cache</td>
+<td>v3 scope</td>
+</tr>
+<tr>
+<td>Inference Runtime</td>
+<td align="center">❌</td>
+<td>llama.cpp · vLLM · API</td>
+<td>tensor 연산 Buy</td>
+</tr>
+<tr>
+<td><strong>Context Scheduler</strong></td>
+<td align="center">✅</td>
+<td>—</td>
+<td>핵심 차별 · 직접 경쟁 없음</td>
+</tr>
+<tr>
+<td><strong>Dynamic Budget</strong></td>
+<td align="center">✅</td>
+<td>—</td>
+<td>Need→Measure→Allocate</td>
+</tr>
+<tr>
+<td><strong>Coverage Engine</strong></td>
+<td align="center">✅</td>
+<td>—</td>
+<td>truncate audit · symbol</td>
+</tr>
+<tr>
+<td><strong>Recovery Scheduler</strong></td>
+<td align="center">✅</td>
+<td>—</td>
+<td>fail→bump→re-retrieve</td>
+</tr>
+<tr>
+<td><strong>Budget-aware Prompt Pack</strong></td>
+<td align="center">✅</td>
+<td>—</td>
+<td>template 아님 · slot pack</td>
+</tr>
+<tr>
+<td><strong>Delta Context Policy</strong></td>
+<td align="center">✅</td>
+<td>—</td>
+<td>Cursor/local 특화 scheduling</td>
+</tr>
+<tr>
+<td><strong>Retrieval Budget Policy</strong></td>
+<td align="center">✅</td>
+<td>—</td>
+<td>rank/ceiling · engine은 Buy</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="영역-buildbuy-투자자용">영역 × Build/Buy (투자자용)</h2>
+<table>
+<thead>
+<tr>
+<th>영역</th>
+<th align="center">Build</th>
+<th align="center">Buy</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Vector engine</td>
+<td align="center">❌</td>
+<td align="center">LlamaIndex</td>
+</tr>
+<tr>
+<td>Tracing</td>
+<td align="center">❌</td>
+<td align="center">OTel</td>
+</tr>
+<tr>
+<td>Prompt cache</td>
+<td align="center">❌</td>
+<td align="center">Provider</td>
+</tr>
+<tr>
+<td>Memory graph / checkpoint</td>
+<td align="center">❌</td>
+<td align="center">LangGraph</td>
+</tr>
+<tr>
+<td>OpenAI gateway</td>
+<td align="center">❌</td>
+<td align="center">LiteLLM</td>
+</tr>
+<tr>
+<td>Agent workflow</td>
+<td align="center">❌</td>
+<td align="center">LangGraph (v2)</td>
+</tr>
+<tr>
+<td>Dashboard</td>
+<td align="center">❌</td>
+<td align="center">Langfuse</td>
+</tr>
+<tr>
+<td><strong>Runtime Scheduler</strong></td>
+<td align="center">✅</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td><strong>Coverage Engine</strong></td>
+<td align="center">✅</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td><strong>Recovery Loop</strong></td>
+<td align="center">✅</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td><strong>Dynamic Budget</strong></td>
+<td align="center">✅</td>
+<td align="center">—</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="같은-계층끼리-비교-why-not-x">같은 계층끼리 비교 (Why not X?)</h2>
+<table>
+<thead>
+<tr>
+<th>계층</th>
+<th>They do</th>
+<th>We do (Policy)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Memory Runtime</strong> ↔ LangGraph / Letta</td>
+<td>State graph · checkpoint · persistence</td>
+<td><strong>Context-aware Memory Scheduling</strong> on top</td>
+</tr>
+<tr>
+<td><strong>OpenAI Proxy</strong> ↔ LiteLLM / OpenRouter</td>
+<td>OpenAI-compatible gateway · routing</td>
+<td><strong>Runtime Policy Layer</strong> above gateway</td>
+</tr>
+<tr>
+<td><strong>Vector Retrieval</strong> ↔ LlamaIndex / Haystack</td>
+<td>Index · embed · retrieve</td>
+<td><strong>Retrieval Budget Policy</strong></td>
+</tr>
+<tr>
+<td><strong>Inference</strong> ↔ vLLM / llama.cpp</td>
+<td>Forward · sampling</td>
+<td>Adapter only</td>
+</tr>
+<tr>
+<td><strong>Scheduler</strong> ↔ <em>(none)</em></td>
+<td>—</td>
+<td><strong>Context Scheduler</strong> (IP)</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Coverage/Recovery는 Proxy 기능이 <strong>아님</strong>. LiteLLM과 같은 축으로 비교하면 안 됨.</p>
+</blockquote>
+<hr>
+<h2 id="코드-레이아웃">코드 레이아웃</h2>
+<pre><code class="language-text">runtime_core/              ← Build (Core IP)
+  context_need.py
+  context_budget.py
+  coverage_checker.py
+  recovery_scheduler.py
+  dynamic_context_scheduler.py
+  scheduler_contract.py      ← Scheduler Inputs/Outputs
+  prompt_builder.py          ← budget-aware pack policy
+
+adapters/                  ← Buy glue
+  memory.py                  LangGraph checkpoint optional
+  retrieval.py               LlamaIndex + legacy BM25
+  gateway.py                 LiteLLM optional
+  trace.py                   OTel
+  observe.py                 Langfuse + legacy SSE
+  langgraph.py               checkpointer stub → wire
+  mcp.py                     v2 stub
+
+legacy/                    ← POC self-impl (격리 · migrate out)
+  memory_store.py
+  retriever.py
+  agent_runs.py
+  context_optimizer.py
+  runtime_optimizer.py
+
+reference/                 ← Cursor Agent POC (v2 SKU)
+integrations/              ← llamaindex · otel · langfuse
+</code></pre>
+<p>Top-level shims <strong>삭제됨</strong>. Application → <code>adapters/</code> · backend → <code>legacy/</code>.</p>
+<hr>
+<h2 id="core-ip-직접-유지-runtimecore-flat-orchestrators">Core IP (직접 유지 · `runtime_core/` + flat orchestrators)</h2>
+<table>
+<thead>
+<tr>
+<th>모듈</th>
+<th>파일</th>
+<th>IP</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ContextNeed</td>
+<td><code>context_need.py</code></td>
+<td>★★★★★</td>
+</tr>
+<tr>
+<td>Dynamic Budget</td>
+<td><code>context_budget.py</code></td>
+<td>★★★★★</td>
+</tr>
+<tr>
+<td>Coverage</td>
+<td><code>coverage_checker.py</code></td>
+<td>★★★★★</td>
+</tr>
+<tr>
+<td>Recovery</td>
+<td><code>recovery_scheduler.py</code></td>
+<td>★★★★★</td>
+</tr>
+<tr>
+<td>Scheduler contract</td>
+<td><code>runtime_core/scheduler_contract.py</code></td>
+<td>★★★★★</td>
+</tr>
+<tr>
+<td>Orchestrator</td>
+<td><code>dynamic_context_scheduler.py</code></td>
+<td>★★★★★</td>
+</tr>
+<tr>
+<td>Prompt Pack Policy</td>
+<td><code>prompt_builder.py</code></td>
+<td>★★★★☆</td>
+</tr>
+<tr>
+<td>Delta policy</td>
+<td><code>message_index.py</code> + adapter</td>
+<td>★★★★☆</td>
+</tr>
+<tr>
+<td>Turn Log / Inspector schema</td>
+<td><code>runtime_turn_log.py</code></td>
+<td>★★☆☆☆</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="adapters-buy-adapters">Adapters (Buy · `adapters/`)</h2>
+<table>
+<thead>
+<tr>
+<th>Adapter</th>
+<th>Buy</th>
+<th>Env</th>
+<th align="center">Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>adapters/retrieval.py</code></td>
+<td>LlamaIndex (+ legacy BM25)</td>
+<td><code>VECTOR_RETRIEVAL=1</code> <code>LLAMAINDEX_ENABLED=1</code></td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td><code>adapters/trace.py</code></td>
+<td>OpenTelemetry</td>
+<td><code>OTEL_FLOW_TRACE=1</code> <code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td><code>adapters/observe.py</code></td>
+<td>Langfuse + legacy SSE</td>
+<td><code>LANGFUSE_*</code></td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td><code>adapters/gateway.py</code></td>
+<td>LiteLLM / llama.cpp</td>
+<td><code>GATEWAY_BACKEND</code> / <code>BACKEND</code></td>
+<td align="center">✅ wired in main</td>
+</tr>
+<tr>
+<td><code>adapters/memory.py</code></td>
+<td>LangGraph checkpointer</td>
+<td><code>LANGGRAPH_ENABLED=1</code></td>
+<td align="center">▶ wire</td>
+</tr>
+<tr>
+<td><code>adapters/langgraph.py</code></td>
+<td>LangGraph store</td>
+<td><code>pip install langgraph</code></td>
+<td align="center">▶ wire</td>
+</tr>
+<tr>
+<td><code>adapters/mcp.py</code></td>
+<td>MCP tools</td>
+<td><code>MCP_ENABLED=1</code></td>
+<td align="center">v2</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="legacy-격리-legacy">Legacy (격리 · `legacy/`)</h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Was</th>
+<th>Now</th>
+<th>Migrate to</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>legacy/memory_store.py</code></td>
+<td>self-impl DB</td>
+<td>adapter backend</td>
+<td>LangGraph store</td>
+</tr>
+<tr>
+<td><code>legacy/retriever.py</code></td>
+<td>self-impl search</td>
+<td>engine wrapper</td>
+<td>LlamaIndex only</td>
+</tr>
+<tr>
+<td><code>legacy/agent_runs.py</code></td>
+<td>self-impl SSE</td>
+<td>observe shim</td>
+<td>Langfuse primary</td>
+</tr>
+<tr>
+<td><code>legacy/context_optimizer.py</code></td>
+<td>static ratios</td>
+<td>deprecated</td>
+<td>dynamic scheduler</td>
+</tr>
+<tr>
+<td><code>legacy/runtime_optimizer.py</code></td>
+<td>truncate only</td>
+<td>deprecated</td>
+<td>coverage + recovery</td>
+</tr>
+</tbody></table>
+<pre><code class="language-bash"># Adapters
+VECTOR_RETRIEVAL=1
+LLAMAINDEX_ENABLED=0|1
+OTEL_FLOW_TRACE=1
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
+LITELLM_ENABLED=0|1
+LITELLM_URL=http://127.0.0.1:4000
+LANGGRAPH_ENABLED=0|1
+FLOW_TRACE=1                # optional .flow.json backup (legacy)
+</code></pre>
+<hr>
+<h2 id="reference-integration-v2-agent-runtime">Reference Integration (v2 Agent Runtime)</h2>
+<p>Cursor 검증용 — <strong>v1 Context Runtime SKU 필수 아님.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>reference/planner.py</code></td>
+<td>AgentPlan</td>
+</tr>
+<tr>
+<td><code>reference/evidence_judge.py</code></td>
+<td>sufficiency</td>
+</tr>
+<tr>
+<td><code>reference/loop_guard.py</code></td>
+<td>final gate</td>
+</tr>
+<tr>
+<td><code>reference/agent_exec.py</code></td>
+<td>tool validation</td>
+</tr>
+</tbody></table>
+<p>Agent graph → LangGraph (Buy). Judge/guard policy → reference until v2 SKU.</p>
+<hr>
+<h2 id="현실적-스택-target">현실적 스택 (Target)</h2>
+<pre><code class="language-text">IDE / Agent
+   ↓
+LiteLLM-compatible Gateway          (adapters/gateway — Buy)
+   ↓
+AI Runtime Policy Layer             (runtime_core — Build)
+   ├─ ContextNeed
+   ├─ DynamicBudget / SchedulerOutputs
+   ├─ CoverageChecker
+   ├─ RecoveryScheduler
+   └─ PromptPackPolicy
+   ↓
+Adapters                            (adapters/ — Buy glue)
+   ├─ LangGraph memory/checkpoint
+   ├─ LlamaIndex retrieval
+   ├─ OpenTelemetry trace
+   ├─ Langfuse observe
+   └─ MCP tools (v2)
+   ↓
+LLM Engine / API                    (Buy)
+</code></pre>
+<hr>
+<h2 id="adapter-구현-순서">Adapter 구현 순서</h2>
+<ol>
+<li>✅ OpenTelemetry — <code>integrations/otel.py</code> → <code>adapters/trace.py</code></li>
+<li>✅ Langfuse — <code>integrations/langfuse.py</code> → <code>adapters/observe.py</code></li>
+<li>✅ LlamaIndex — <code>integrations/llamaindex.py</code> → <code>adapters/retrieval.py</code></li>
+<li>✅ Legacy isolation — <code>memory_store</code> · <code>retriever</code> · <code>agent_runs</code> → <code>legacy/</code></li>
+<li>▶ LiteLLM gateway — <code>LITELLM_ENABLED=1</code> in production path</li>
+<li>▶ LangGraph checkpointer — replace file store backend</li>
+<li>▶ MCP — v2 Agent Runtime</li>
+</ol>
+<p>E2E:</p>
+<pre><code class="language-bash">python3 scripts/check-architecture-boundary.py
+python3 scripts/benchmark-gateway-swap.py           # BACKEND=mock (CI) or GATEWAY_LIVE=1
+python3 scripts/benchmark-retriever-swap.py           # legacy BM25 vs LlamaIndex (same adapter API)
+python3 scripts/test-observability-export.py        # OTel + turn log smoke
+bash scripts/run-vector-e2e.sh
+python3 scripts/benchmark-dynamic-budget-matrix.py
+python3 scripts/benchmark-recovery-e2e.py
+</code></pre>
+<h3 id="architecture-boundary-rules-enforced">Architecture boundary rules (enforced)</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>runtime_core/</code></td>
+<td><code>legacy</code> · <code>adapters</code> · <code>integrations</code> · <code>reference</code> import 금지</td>
+</tr>
+<tr>
+<td>orchestration</td>
+<td><code>legacy</code> import 금지 — <strong>예외</strong>: <code>prompt_builder</code> → <code>legacy.retriever</code> format only</td>
+</tr>
+<tr>
+<td><code>reference/</code></td>
+<td><code>legacy</code> · <code>integrations</code> import 금지 → <code>adapters</code> 사용</td>
+</tr>
+<tr>
+<td><code>legacy/</code></td>
+<td><code>adapters/</code> · <code>integrations/</code> · legacy tests만 import 허용</td>
+</tr>
+<tr>
+<td>top-level shim</td>
+<td><code>memory_store.py</code> 등 존재 시 FAIL</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="anti-patterns-삽질-방지">Anti-patterns (삽질 방지)</h2>
+<table>
+<thead>
+<tr>
+<th>하지 말 것</th>
+<th>이유</th>
+<th>대신</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>memory DB 직접 확장</td>
+<td>LangGraph/Letta와 중복</td>
+<td><code>adapters/memory.py</code></td>
+</tr>
+<tr>
+<td>vector engine 직접</td>
+<td>LlamaIndex 재발명</td>
+<td><code>adapters/retrieval.py</code></td>
+</tr>
+<tr>
+<td>자체 trace 포맷</td>
+<td>대시보드 연동 막힘</td>
+<td>OTel span</td>
+</tr>
+<tr>
+<td>OpenAI proxy 유지보수</td>
+<td>provider별 payload 지옥</td>
+<td>LiteLLM</td>
+</tr>
+<tr>
+<td>ReAct loop 직접</td>
+<td>LangGraph 중복</td>
+<td>reference only</td>
+</tr>
+</tbody></table>
+<p><em>Last updated: 2026-06-18</em></p>
+
+      <p class="doc-meta">GitHub Markdown CSS + Mermaid.js (browser) · <code>INTEGRATIONS.md</code></p>
+    </article>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    const SOURCES = [];
+    document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+      SOURCES[i] = el.textContent.trim();
+    });
+
+    function theme() {
+      return document.documentElement.dataset.theme === "dark" ? "dark" : "default";
+    }
+
+    function applyTheme(t) {
+      document.documentElement.dataset.theme = t;
+      document.getElementById("gh-md-light").disabled = t === "dark";
+      document.getElementById("gh-md-dark").disabled = t !== "dark";
+    }
+
+    const saved = localStorage.getItem("md-preview-theme");
+    applyTheme(saved === "light" || saved === "dark"
+      ? saved
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+
+    document.getElementById("theme-toggle").onclick = async () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      applyTheme(next);
+      localStorage.setItem("md-preview-theme", next);
+      await renderAll();
+    };
+
+    async function renderAll() {
+      document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+        el.innerHTML = SOURCES[i];
+        el.removeAttribute("data-processed");
+      });
+
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: theme(),
+        securityLevel: "loose",
+        fontFamily: '"Noto Sans KR", "trebuchet ms", verdana, arial, sans-serif',
+        flowchart: {
+          htmlLabels: true,
+          curve: "basis",
+          padding: 10,
+          nodeSpacing: 35,
+          rankSpacing: 40,
+          useMaxWidth: true,
+          wrappingWidth: 180,
+        },
+        state: {
+          nodeSpacing: 30,
+          rankSpacing: 35,
+          useMaxWidth: true,
+        },
+        sequence: {
+          useMaxWidth: true,
+          wrap: true,
+          width: 120,
+          height: 50,
+          boxMargin: 8,
+        },
+        themeVariables: {
+          fontSize: "14px",
+        },
+      });
+
+      await mermaid.run({ querySelector: ".mermaid" });
+    }
+
+    renderAll().catch((e) => {
+      console.error(e);
+      document.body.insertAdjacentHTML("beforeend",
+        '<p style="color:red;padding:1rem">Mermaid 로드 실패 — 인터넷 연결 확인 또는 <code>./scripts/serve-vision-html.sh</code></p>');
+    });
+  </script>
+</body>
+</html>

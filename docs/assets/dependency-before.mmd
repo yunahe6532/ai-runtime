@@ -1,0 +1,24 @@
+flowchart TB
+  subgraph before_app["App — tightly coupled"]
+    MAIN[main.py]
+    PB[prompt_builder.py]
+    IR[intent_router.py]
+  end
+  subgraph before_legacy["Top-level / direct legacy"]
+    MS[memory_store.py]
+    RET[retriever.py]
+    AR[agent_runs.py]
+    FT[flow_trace.py]
+  end
+  subgraph before_engine["Direct engine I/O"]
+    QW[qwen_request / httpx → llama URL]
+  end
+  MAIN --> MS
+  MAIN --> RET
+  MAIN --> AR
+  MAIN --> FT
+  MAIN --> QW
+  PB --> RET
+  IR --> MS
+  classDef bad fill:#fee,stroke:#c33
+  class MS,RET,AR,FT,QW bad

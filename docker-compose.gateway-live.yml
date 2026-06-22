@@ -1,0 +1,35 @@
+# Gateway live benchmark profile — expose backends to host for GATEWAY_LIVE=1 benches.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.gateway-live.yml up -d llama-long litellm
+#   ./scripts/start-gateway-live.sh
+
+services:
+  llama-long:
+    profiles:
+      - long
+      - gateway-live
+    ports:
+      - "8082:8082"
+
+  llama-fast:
+    ports:
+      - "8081:8081"
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: cursor-local-llm-litellm
+    restart: "no"
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./configs/litellm-gateway-live.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    depends_on:
+      llama-long:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:4000/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s

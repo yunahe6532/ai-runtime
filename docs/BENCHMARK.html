@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BENCHMARK</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-light.min.css" id="gh-md-light" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-dark.min.css" id="gh-md-dark" disabled />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fff;
+      color-scheme: light;
+    }
+    html[data-theme="dark"] body { background: #0d1117; color-scheme: dark; }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.55rem 1.25rem;
+      border-bottom: 1px solid #d0d7de;
+      background: #f6f8fa;
+      font-size: 0.875rem;
+    }
+    html[data-theme="dark"] .toolbar {
+      border-color: #30363d; background: #161b22; color: #e6edf3;
+    }
+    .toolbar button {
+      font: inherit; cursor: pointer;
+      border: 1px solid #d0d7de; background: #fff;
+      border-radius: 6px; padding: 0.2rem 0.55rem;
+    }
+    html[data-theme="dark"] .toolbar button {
+      border-color: #30363d; background: #21262d; color: #e6edf3;
+    }
+    .toolbar a { color: inherit; opacity: 0.65; text-decoration: none; }
+
+    .page { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    .markdown-body { min-width: 0; }
+
+    /* Cursor MD preview 스타일 Mermaid 카드 */
+    .markdown-body .mermaid-wrap {
+      margin: 0.85rem 0 1.25rem;
+      padding: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    html[data-theme="dark"] .markdown-body .mermaid-wrap {
+      border-color: #30363d; background: #161b22;
+    }
+    .markdown-body pre.mermaid {
+      margin: 0; padding: 0; background: transparent; border: 0;
+      font-family: inherit; text-align: center;
+    }
+    /* Mermaid가 그린 SVG — IDE처럼 컨테이너에 맞춤 (축소 눌림 없음) */
+    .markdown-body .mermaid-wrap svg {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .doc-meta {
+      margin-top: 2rem; padding-top: 1rem;
+      border-top: 1px solid #d0d7de;
+      font-size: 0.8rem; opacity: 0.6;
+    }
+    html[data-theme="dark"] .doc-meta { border-color: #30363d; }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <strong>BENCHMARK</strong>
+    <span>2026-06-21 · Mermaid 4개</span>
+    <div>
+      <button type="button" id="theme-toggle">🌓</button>
+      <a href="#top">↑</a>
+    </div>
+  </header>
+  <div class="page" id="top">
+    <article class="markdown-body">
+<h1 id="benchmark-변천사-상세-수치">Benchmark — 변천사 & 상세 수치</h1>
+<blockquote>
+<p><strong>제품 · Flow 요약</strong> → <a href="./VISION.md">VISION.md</a><br><strong>아키텍처 · Pipeline</strong> → <a href="./ARCHITECTURE.md">ARCHITECTURE.md</a><br>원본: <code>tmp/benchmark-*.json</code> · WSL2 · RTX 4080 + 3080 Ti · RAM 64GB</p>
+</blockquote>
+<p><em>Last updated: 2026-06-18</em></p>
+<hr>
+<h2 id="핵심-그래프-3초-이해">핵심 그래프 (3초 이해)</h2>
+<h3 id="context-압축-funnel">Context 압축 Funnel</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-1">flowchart LR
+    A["Cursor IN&lt;br/&gt;103,560 tok"] --&gt; B["Runtime Proxy&lt;br/&gt;~10,160 tok&lt;br/&gt;−90%"]
+    B --&gt; C["Dynamic Pack&lt;br/&gt;~638–2K tok"]
+    C --&gt; D["LLM prefill&lt;br/&gt;effective"]</pre></div>
+<pre><code class="language-text">103K  →  10K  →  ~3K  →  ~0.6–2K effective
+(Cursor) (proxy) (budget slots) (measured p1)
+</code></pre>
+<h3 id="runtime-success-funnel">Runtime Success Funnel</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-2">flowchart LR
+    N["Cursor naive&lt;br/&gt;79%"] --&gt; M["+ Memory proxy"]
+    M --&gt; A["+ Agent gate"]
+    A --&gt; P1["+ P1 judge/guard&lt;br/&gt;100% 20 tasks"]</pre></div>
+<h3 id="recovery-e2e-context-runtime-ip">Recovery E2E (Context Runtime IP)</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-3">flowchart TD
+    F[Coverage Fail 0.36] --&gt; B[Budget Bump]
+    B --&gt; R[Re-Retrieve]
+    R --&gt; P[Prompt Rebuild]
+    P --&gt; OK[Coverage Pass 1.00]
+    OK --&gt; FIN[Final Allowed]</pre></div>
+<p>검증: <code>python3 scripts/benchmark-recovery-e2e.py</code></p>
+<h3 id="dynamic-budget-regression">Dynamic Budget Regression</h3>
+<pre><code class="language-bash">python3 scripts/benchmark-dynamic-budget-matrix.py   # 25/25
+bash scripts/run-vector-e2e.sh                       # 115 artifacts BM25+LlamaIndex
+</code></pre>
+<hr>
+<h2 id="변천사-한눈에">변천사 한눈에</h2>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-4">flowchart LR
+    L0["Legacy&lt;br/&gt;long+vl+fast&lt;br/&gt;Coder+VL 분리"]
+    L1["before&lt;br/&gt;Coder 5/5"]
+    L2["memory proxy&lt;br/&gt;ctx −90%"]
+    L3["qwen3_6&lt;br/&gt;35B MoE unified"]
+    L4["after-fix4&lt;br/&gt;7/7 100%"]
+    L5["score-30&lt;br/&gt;79→100%"]
+    L6["27b_p1&lt;br/&gt;20/20 + judge"]
+
+    L0 --&gt; L1 --&gt; L2 --&gt; L3 --&gt; L4 --&gt; L5 --&gt; L6
+
+    style L0 fill:#edf2f7,stroke:#a0aec0
+    style L6 fill:#f0fff4,stroke:#48bb78</pre></div>
+<hr>
+<h2 id="인프라-변천">인프라 변천</h2>
+<table>
+<thead>
+<tr>
+<th>Era</th>
+<th align="center">Router 모드</th>
+<th>llama-long</th>
+<th>llama-fast</th>
+<th>llama-vl</th>
+<th align="center">VL pass</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Legacy</strong></td>
+<td align="center"><code>legacy</code></td>
+<td>Coder 30B</td>
+<td>(optional)</td>
+<td>VL 30B <strong>별도</strong></td>
+<td align="center">ON</td>
+<td>VRAM 2~3배, vision→vl 라우팅</td>
+</tr>
+<tr>
+<td><strong>Unified 35B</strong></td>
+<td align="center"><code>unified</code></td>
+<td>Qwen3.6-35B + mmproj</td>
+<td>OFF</td>
+<td>OFF (same weights)</td>
+<td align="center">OFF</td>
+<td>단일 서버, VL 통합</td>
+</tr>
+<tr>
+<td><strong>Unified 27B</strong> ★</td>
+<td align="center"><code>unified</code></td>
+<td>Qwen3.6-27B + mmproj</td>
+<td>OFF</td>
+<td>OFF</td>
+<td align="center">OFF</td>
+<td><strong>운영 권장</strong>, VRAM KV 여유</td>
+</tr>
+</tbody></table>
+<pre><code class="language-text">Legacy:  Cursor → Router → long (Coder) + vl (VL 전용) + fast
+Unified: Cursor → Router → long ONLY (코드+비전 동일 weights)
+</code></pre>
+<hr>
+<h2 id="모델-카탈로그-프로필별">모델 카탈로그 (프로필별)</h2>
+<p><code>configs/model-profiles.env</code> 기준. 파일명이 <strong>정확한 모델 식별자</strong>다.</p>
+<table>
+<thead>
+<tr>
+<th>Profile</th>
+<th>정확한 모델명</th>
+<th>양자화</th>
+<th align="center">파라미터</th>
+<th>GGUF 파일</th>
+<th>mmproj</th>
+<th align="center">ctx 운영</th>
+<th align="center">KV</th>
+<th align="center">tensor split</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><code>qwen3_coder</code></strong> (Legacy)</td>
+<td><code>Qwen3-Coder-30B-A3B-Instruct</code></td>
+<td><strong>UD-Q4_K_XL</strong></td>
+<td align="center">30B MoE</td>
+<td><code>Qwen3-Coder-30B-A3B-Instruct-UD-Q4_K_XL.gguf</code></td>
+<td>—</td>
+<td align="center"><strong>200K</strong></td>
+<td align="center">DRAM offload</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td><strong><code>qwen3_coder</code></strong> VL 서버</td>
+<td><code>Qwen3-VL-30B-A3B-Instruct</code></td>
+<td><strong>Q4_K_M</strong></td>
+<td align="center">30B MoE</td>
+<td><code>Qwen3VL-30B-A3B-Instruct-Q4_K_M.gguf</code></td>
+<td><code>mmproj-Qwen3VL-30B-A3B-Instruct-F16.gguf</code></td>
+<td align="center">4K~32K</td>
+<td align="center">VRAM/DRAM</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td><strong><code>qwen3_6</code></strong> (실험)</td>
+<td><code>Qwen3.6-35B-A3B</code></td>
+<td><strong>UD-Q4_K_M</strong></td>
+<td align="center">35B MoE</td>
+<td><code>Qwen3.6-35B-A3B-UD-Q4_K_M.gguf</code></td>
+<td><code>mmproj-F16.gguf</code></td>
+<td align="center">32K</td>
+<td align="center">VRAM 부족*</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td><strong><code>qwen3_6_27b</code></strong> ★ (운영)</td>
+<td><code>Qwen3.6-27B</code></td>
+<td><strong>UD-Q4_K_XL</strong></td>
+<td align="center">27B dense</td>
+<td><code>Qwen3.6-27B-UD-Q4_K_XL.gguf</code></td>
+<td><code>mmproj-F16.gguf</code></td>
+<td align="center"><strong>32K</strong></td>
+<td align="center"><strong>VRAM</strong></td>
+<td align="center"><strong>43,57</strong></td>
+</tr>
+</tbody></table>
+<p>* 35B MoE weights ~<strong>28GB</strong> → 32K VRAM KV 슬롯 거의 없음. 벤치·비교용.<br>★ 27B dense weights ~<strong>17.6GB</strong> → 32K VRAM KV ~<strong>9GB 여유</strong>.</p>
+<p><strong>Fallback</strong>: <code>qwen3_6_27b</code> → <code>qwen3_coder</code> (장애 시)</p>
+<hr>
+<h2 id="종합-비교표-era-수치">종합 비교표 (Era × 수치)</h2>
+<table>
+<thead>
+<tr>
+<th>Era</th>
+<th>벤치 라벨</th>
+<th>모델 (양자화)</th>
+<th>Router 변경</th>
+<th align="center">Agent</th>
+<th align="center">Runtime score</th>
+<th align="center">ctx proxy</th>
+<th align="center">gen tok/s†</th>
+<th align="center">prompt tok/s‡</th>
+<th align="center">wall/case</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cursor naive</td>
+<td>—</td>
+<td>(full history)</td>
+<td>없음</td>
+<td align="center">—</td>
+<td align="center">79%</td>
+<td align="center">103,560</td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center">13.9s</td>
+</tr>
+<tr>
+<td>Legacy VL분리</td>
+<td><code>coder-vs-vl</code></td>
+<td>Coder UD-Q4_K_XL</td>
+<td>legacy 3-srv</td>
+<td align="center">3/5 tool</td>
+<td align="center">—</td>
+<td align="center">200K long</td>
+<td align="center"><strong>51.3</strong></td>
+<td align="center">~600–1600</td>
+<td align="center">0.6–1.7s</td>
+</tr>
+<tr>
+<td>Legacy baseline</td>
+<td><code>before</code></td>
+<td>Coder UD-Q4_K_XL</td>
+<td>proxy only</td>
+<td align="center"><strong>5/5</strong></td>
+<td align="center">—</td>
+<td align="center">~734</td>
+<td align="center"><strong>32.7</strong></td>
+<td align="center">780 / 17.5</td>
+<td align="center">1.5s</td>
+</tr>
+<tr>
+<td>+memory proxy</td>
+<td>—</td>
+<td>동일</td>
+<td>state+delta</td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center"><strong>−90%</strong></td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td>Unified 35B</td>
+<td><code>after-qwen36</code></td>
+<td>35B UD-Q4_K_M</td>
+<td>unified long</td>
+<td align="center">5/6</td>
+<td align="center">—</td>
+<td align="center">~645</td>
+<td align="center">17.2</td>
+<td align="center">987 / 21.5</td>
+<td align="center">9.9s</td>
+</tr>
+<tr>
+<td>+vision case</td>
+<td><code>after-qwen36-vision</code></td>
+<td>35B + mmproj</td>
+<td>unified</td>
+<td align="center">5/7</td>
+<td align="center">—</td>
+<td align="center">~650</td>
+<td align="center">19.1</td>
+<td align="center">1034 / 21.5</td>
+<td align="center">7.7s</td>
+</tr>
+<tr>
+<td>+router fix</td>
+<td><code>after-fix4</code></td>
+<td>35B + mmproj</td>
+<td>evidence gate</td>
+<td align="center"><strong>7/7</strong></td>
+<td align="center">—</td>
+<td align="center">~578</td>
+<td align="center">15.7</td>
+<td align="center">968 / 22.1</td>
+<td align="center">2.3s</td>
+</tr>
+<tr>
+<td>Runtime suite</td>
+<td><code>score-30</code></td>
+<td>35B</td>
+<td>plan_state</td>
+<td align="center">—</td>
+<td align="center"><strong>100%</strong> 30/30</td>
+<td align="center">10,160</td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center">2.8s</td>
+</tr>
+<tr>
+<td>27B migrate</td>
+<td><code>qwen3_6_27b</code></td>
+<td>27B UD-Q4_K_XL</td>
+<td>27B profile</td>
+<td align="center">6/7</td>
+<td align="center">85% 17/20</td>
+<td align="center">~663</td>
+<td align="center"><strong>28.6</strong></td>
+<td align="center">1100 / <strong>35.2</strong></td>
+<td align="center">4.0s</td>
+</tr>
+<tr>
+<td><strong>P1 현재</strong></td>
+<td><code>qwen3_6_27b_p1</code></td>
+<td>27B + judge</td>
+<td>planner+guard</td>
+<td align="center"><strong>6/6</strong></td>
+<td align="center"><strong>100%</strong> 20/20</td>
+<td align="center">~638</td>
+<td align="center"><strong>24.6</strong></td>
+<td align="center">1175 / 34.8</td>
+<td align="center">2.8s</td>
+</tr>
+</tbody></table>
+<p>† <code>avg_gen_tps</code> (agent benchmark wall 기준)<br>‡ llama-server <code>avg_prompt_tps</code> / <code>avg_gen_tps</code> (내부 타이밍)</p>
+<hr>
+<h2 id="토큰-속도-변천">토큰 속도 변천</h2>
+<h3 id="legacy-vl-서버-기준선-benchmark-coder-vs-vljson">Legacy — VL 서버 기준선 (`benchmark-coder-vs-vl.json`)</h3>
+<p>별도 <code>llama-vl</code> 컨테이너, <code>Qwen3VL-30B-A3B-Instruct-Q4_K_M</code>.</p>
+<table>
+<thead>
+<tr>
+<th>조건</th>
+<th align="center">gen tok/s</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ctx 4K, VRAM KV</td>
+<td align="center"><strong>168.0</strong></td>
+<td>최고 속도 (짧은 ctx)</td>
+</tr>
+<tr>
+<td>ctx 24K, max_tokens 1000</td>
+<td align="center"><strong>176.2</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>DRAM 200K, tiny</td>
+<td align="center">67.2</td>
+<td>KV offload</td>
+</tr>
+<tr>
+<td>DRAM 200K, small</td>
+<td align="center">54.4</td>
+<td></td>
+</tr>
+<tr>
+<td>DRAM 200K, medium</td>
+<td align="center">47.3</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>VRAM KV 32K</strong></td>
+<td align="center"><strong>27.1</strong></td>
+<td>27B 운영과 유사 조건</td>
+</tr>
+</tbody></table>
+<h3 id="legacy-coder-long-benchmark-coder-vs-vljson">Legacy — Coder long (`benchmark-coder-vs-vl.json`)</h3>
+<p><code>Qwen3-Coder-30B-A3B-Instruct-UD-Q4_K_XL</code>, ctx 200K.</p>
+<table>
+<thead>
+<tr>
+<th>케이스</th>
+<th align="center">gen tok/s</th>
+<th align="center">prompt tok/s</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>tiny mt64</td>
+<td align="center">51.5</td>
+<td align="center">655</td>
+</tr>
+<tr>
+<td>small mt256</td>
+<td align="center">48.6</td>
+<td align="center">1154</td>
+</tr>
+<tr>
+<td>medium mt512</td>
+<td align="center">52.7</td>
+<td align="center">606</td>
+</tr>
+<tr>
+<td>large mt1000</td>
+<td align="center">52.6</td>
+<td align="center">1135</td>
+</tr>
+<tr>
+<td><strong>평균</strong></td>
+<td align="center"><strong>51.3</strong></td>
+<td align="center">~800</td>
+</tr>
+</tbody></table>
+<p>VL 대비: Coder long은 gen <strong>~51 tok/s</strong> vs VL 32K KV <strong>~27 tok/s</strong> — Coder가 decode 빠름.<br>단, tool pass <strong>3/5</strong> (Read/Grep 실패多).</p>
+<h3 id="unified-35b-moe-router-개선에-따른-속도">Unified 35B MoE — Router 개선에 따른 속도</h3>
+<table>
+<thead>
+<tr>
+<th>라벨</th>
+<th align="center">gen tok/s (wall)</th>
+<th align="center">llama gen tok/s</th>
+<th align="center">wall/case</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>after-qwen36</td>
+<td align="center">17.2</td>
+<td align="center">21.5</td>
+<td align="center">9.9s</td>
+<td>전환 직후 느림</td>
+</tr>
+<tr>
+<td>after-fix2</td>
+<td align="center">9.1</td>
+<td align="center">22.5</td>
+<td align="center">1.8s</td>
+<td>wall↓ (프로토콜 수습)</td>
+</tr>
+<tr>
+<td><strong>after-fix4</strong></td>
+<td align="center">15.7</td>
+<td align="center">22.1</td>
+<td align="center">2.3s</td>
+<td><strong>7/7 정점</strong></td>
+</tr>
+</tbody></table>
+<h3 id="unified-27b-dense-현재-운영">Unified 27B dense — 현재 운영</h3>
+<table>
+<thead>
+<tr>
+<th>라벨</th>
+<th align="center">gen tok/s (wall)</th>
+<th align="center">llama gen tok/s</th>
+<th align="center">prompt tok/s</th>
+<th align="center">wall/case</th>
+<th align="center">agent</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>qwen3_6_27b</td>
+<td align="center"><strong>28.6</strong></td>
+<td align="center"><strong>35.2</strong></td>
+<td align="center">1100</td>
+<td align="center">4.0s</td>
+<td align="center">6/7</td>
+</tr>
+<tr>
+<td><strong>qwen3_6_27b_p1</strong></td>
+<td align="center"><strong>24.6</strong></td>
+<td align="center"><strong>34.8</strong></td>
+<td align="center">1175</td>
+<td align="center">2.8s</td>
+<td align="center"><strong>6/6</strong></td>
+</tr>
+</tbody></table>
+<p>27B가 35B MoE llama gen (<strong>~22 tok/s</strong>) 대비 <strong>+60% decode</strong> 빠름.<br>48턴 ping-pong 케이스 마지막 turn: ~<strong>28 tok/s</strong> (4565 chars).</p>
+<h3 id="thinking-latency-benchmark-thinking-qwen3627blog-27b">Thinking latency (`benchmark-thinking-qwen3627b.log`, 27B)</h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th align="center">preserve_thinking</th>
+<th align="center">wall time</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>tool_planning</td>
+<td align="center">ON</td>
+<td align="center"><strong>2.8s</strong></td>
+</tr>
+<tr>
+<td>tool_planning</td>
+<td align="center">OFF</td>
+<td align="center">10.1s</td>
+</tr>
+<tr>
+<td>tool_planning</td>
+<td align="center">thinking OFF</td>
+<td align="center">11.3s</td>
+</tr>
+<tr>
+<td>final_answer</td>
+<td align="center">OFF</td>
+<td align="center">17.3s</td>
+</tr>
+</tbody></table>
+<p>→ tool loop에서 <code>preserve_thinking=ON</code>이 <strong>3~4× 빠름</strong>.</p>
+<hr>
+<h2 id="agent-benchmark-전체-benchmark-cursor-agentjson">Agent Benchmark 전체 (`benchmark-cursor-agent.json`)</h2>
+<table>
+<thead>
+<tr>
+<th>라벨</th>
+<th>프로필</th>
+<th>모델</th>
+<th align="center">통과</th>
+<th align="center">tool_match</th>
+<th align="center">json</th>
+<th align="center">vision</th>
+<th align="center">leaks</th>
+<th align="center">ctx avg</th>
+<th align="center">gen t/s</th>
+<th align="center">wall</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>before</td>
+<td>qwen3_coder</td>
+<td>Coder-30B <strong>Q4_K_XL</strong></td>
+<td align="center">5/5</td>
+<td align="center">100%</td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center">0</td>
+<td align="center">734</td>
+<td align="center">32.7</td>
+<td align="center">1460</td>
+</tr>
+<tr>
+<td>after-qwen36</td>
+<td>qwen3_6</td>
+<td>35B <strong>Q4_K_M</strong></td>
+<td align="center">5/6</td>
+<td align="center">100%</td>
+<td align="center">100%</td>
+<td align="center">—</td>
+<td align="center">0</td>
+<td align="center">645</td>
+<td align="center">17.2</td>
+<td align="center">9890</td>
+</tr>
+<tr>
+<td>after-qwen36-vision</td>
+<td>qwen3_6</td>
+<td>35B + mmproj</td>
+<td align="center">5/7</td>
+<td align="center">100%</td>
+<td align="center">100%</td>
+<td align="center">0%</td>
+<td align="center">1</td>
+<td align="center">650</td>
+<td align="center">19.1</td>
+<td align="center">7672</td>
+</tr>
+<tr>
+<td>after-fix</td>
+<td>qwen3_6</td>
+<td>35B + mmproj</td>
+<td align="center">4/7</td>
+<td align="center">100%</td>
+<td align="center">100%</td>
+<td align="center">0%</td>
+<td align="center">0</td>
+<td align="center">652</td>
+<td align="center">15.5</td>
+<td align="center">4098</td>
+</tr>
+<tr>
+<td>after-fix2</td>
+<td>qwen3_6</td>
+<td>35B + mmproj</td>
+<td align="center">4/7</td>
+<td align="center">100%</td>
+<td align="center">100%</td>
+<td align="center">0%</td>
+<td align="center">0</td>
+<td align="center">743</td>
+<td align="center">9.1</td>
+<td align="center">1826</td>
+</tr>
+<tr>
+<td>after-fix3</td>
+<td>qwen3_6</td>
+<td>35B + mmproj</td>
+<td align="center">6/7</td>
+<td align="center">100%</td>
+<td align="center">100%</td>
+<td align="center">100%</td>
+<td align="center">0</td>
+<td align="center">605</td>
+<td align="center">14.3</td>
+<td align="center">2238</td>
+</tr>
+<tr>
+<td><strong>after-fix4</strong></td>
+<td>qwen3_6</td>
+<td>35B + mmproj</td>
+<td align="center"><strong>7/7</strong></td>
+<td align="center">100%</td>
+<td align="center">100%</td>
+<td align="center">100%</td>
+<td align="center">0</td>
+<td align="center">578</td>
+<td align="center">15.7</td>
+<td align="center">2306</td>
+</tr>
+<tr>
+<td>qwen3_6_27b</td>
+<td>qwen3_6_27b</td>
+<td>27B <strong>Q4_K_XL</strong></td>
+<td align="center">6/7</td>
+<td align="center">100%</td>
+<td align="center">100%</td>
+<td align="center">100%</td>
+<td align="center">1</td>
+<td align="center">663</td>
+<td align="center">28.6</td>
+<td align="center">3976</td>
+</tr>
+<tr>
+<td><strong>qwen3_6_27b_p1</strong></td>
+<td>qwen3_6_27b</td>
+<td>27B + mmproj</td>
+<td align="center"><strong>6/6</strong></td>
+<td align="center">100%</td>
+<td align="center">100%</td>
+<td align="center">—</td>
+<td align="center">0</td>
+<td align="center">692</td>
+<td align="center">24.6</td>
+<td align="center">2789</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="runtime-score-변천-benchmark-runtime-scorejson">Runtime Score 변천 (`benchmark-runtime-score.json`)</h2>
+<table>
+<thead>
+<tr>
+<th>라벨</th>
+<th align="center">tasks</th>
+<th>profile</th>
+<th align="center">success naive→rt</th>
+<th align="center">tools 3.x→</th>
+<th align="center">time ms</th>
+<th align="center">passed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>score-30</td>
+<td align="center">30</td>
+<td>qwen3_6</td>
+<td align="center">79% → <strong>100%</strong></td>
+<td align="center">3.03 → <strong>0.60</strong></td>
+<td align="center">13913 → <strong>2752</strong></td>
+<td align="center">30/30</td>
+</tr>
+<tr>
+<td>score-100</td>
+<td align="center">100</td>
+<td>qwen3_6</td>
+<td align="center">79% → <strong>99%</strong></td>
+<td align="center">3.10 → <strong>0.61</strong></td>
+<td align="center">12383 → <strong>2437</strong></td>
+<td align="center">99/100</td>
+</tr>
+<tr>
+<td>qwen3_6_27b</td>
+<td align="center">20</td>
+<td>27B</td>
+<td align="center">79% → 85%</td>
+<td align="center">3.10 → 0.75</td>
+<td align="center">20120 → 4868</td>
+<td align="center">17/20</td>
+</tr>
+<tr>
+<td><strong>qwen3_6_27b_p1</strong></td>
+<td align="center">20</td>
+<td>27B+P1</td>
+<td align="center">79% → <strong>100%</strong></td>
+<td align="center">3.10 → <strong>0.60</strong></td>
+<td align="center">20326 → <strong>3934</strong></td>
+<td align="center"><strong>20/20</strong></td>
+</tr>
+</tbody></table>
+<p>공통: Cursor naive ctx <strong>103,560</strong> → Runtime proxy <strong>~10,160</strong> (<strong>−90.2%</strong>)</p>
+<hr>
+<h2 id="context-압축-benchmark-runtimejson">Context 압축 (`benchmark-runtime.json`)</h2>
+<table>
+<thead>
+<tr>
+<th>케이스</th>
+<th align="center">Cursor tokens</th>
+<th align="center">LLM prompt</th>
+<th align="center">압축률</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>실제 세션 <code>1781741948_0001</code> (289 msgs)</td>
+<td align="center">103,560</td>
+<td align="center">state+delta</td>
+<td align="center"><strong>90.2%</strong></td>
+</tr>
+<tr>
+<td>10턴 synthetic</td>
+<td align="center">1,627</td>
+<td align="center">485</td>
+<td align="center">66.7%</td>
+</tr>
+<tr>
+<td>50턴 synthetic</td>
+<td align="center">7,707</td>
+<td align="center">488</td>
+<td align="center"><strong>93.0%</strong></td>
+</tr>
+<tr>
+<td>agent proxy</td>
+<td align="center">2,844</td>
+<td align="center">991</td>
+<td align="center">72.5%</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="마일스톤-무엇이-바뀌었나">마일스톤 × 무엇이 바뀌었나</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>시점</th>
+<th>인프라 / 모델</th>
+<th>Router 기능</th>
+<th>벤치 임팩트</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td>초기</td>
+<td>long+<strong>vl</strong>+fast, Coder+VL</td>
+<td>단순 proxy</td>
+<td>VL 168 tok/s, Coder 51 tok/s</td>
+</tr>
+<tr>
+<td>1</td>
+<td>before</td>
+<td>Coder UD-Q4_K_XL</td>
+<td>agent 정규화</td>
+<td><strong>5/5</strong> tool_match 100%</td>
+</tr>
+<tr>
+<td>2</td>
+<td>+memory</td>
+<td>동일</td>
+<td>state+delta proxy</td>
+<td>ctx <strong>−90%</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>after-qwen36</td>
+<td><strong>35B</strong> UD-Q4_K_M unified</td>
+<td>native tool parser</td>
+<td>5/6, json 100%</td>
+</tr>
+<tr>
+<td>4</td>
+<td>after-fix*</td>
+<td>35B + mmproj</td>
+<td>plan_state, evidence gate, analyzer</td>
+<td><strong>7/7</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td>score-30</td>
+<td>35B</td>
+<td>runtime score suite</td>
+<td>success <strong>100%</strong></td>
+</tr>
+<tr>
+<td>6</td>
+<td>27B</td>
+<td><strong>27B</strong> UD-Q4_K_XL</td>
+<td>VRAM KV, tensor 43/57</td>
+<td>gen <strong>35 tok/s</strong>, weights −10GB</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>p1</strong></td>
+<td>27B + P1</td>
+<td>judge, loop guard, inspector</td>
+<td><strong>20/20</strong>, agent 6/6</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="통과-게이트-현재-qwen3627bp1">통과 게이트 (현재 `qwen3_6_27b_p1`)</h2>
+<table>
+<thead>
+<tr>
+<th>게이트</th>
+<th>목표</th>
+<th align="center">달성</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Runtime score 20 tasks</td>
+<td>≥ 95%</td>
+<td align="center"><strong>100%</strong></td>
+</tr>
+<tr>
+<td>Agent 6-case</td>
+<td>100%</td>
+<td align="center"><strong>100%</strong></td>
+</tr>
+<tr>
+<td>tool_match</td>
+<td>100%</td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td>json_valid</td>
+<td>≥ 90%</td>
+<td align="center"><strong>100%</strong></td>
+</tr>
+<tr>
+<td>xml/final leaks</td>
+<td>0</td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td>vision (7-case)</td>
+<td>100%</td>
+<td align="center">▶ flaky 1 run</td>
+</tr>
+<tr>
+<td>Context 압축</td>
+<td>≥ 80%</td>
+<td align="center"><strong>90.2%</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="재현">재현</h2>
+<pre><code class="language-bash"># 프로필 전환
+./scripts/switch-model.sh qwen3_6_27b   # 운영
+./scripts/switch-model.sh qwen3_coder # legacy 비교
+
+# 벤치
+python3 scripts/benchmark-cursor-agent.py --label qwen3_6_27b_p1
+python3 scripts/benchmark-runtime-score.py --tasks 30
+python3 scripts/benchmark-runtime.py
+python3 scripts/benchmark-thinking-runtime.py
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>파일</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tmp/benchmark-cursor-agent.json</code></td>
+<td>Agent 변천 (10 runs 누적)</td>
+</tr>
+<tr>
+<td><code>tmp/benchmark-runtime-score.json</code></td>
+<td>Runtime score 변천</td>
+</tr>
+<tr>
+<td><code>tmp/benchmark-runtime.json</code></td>
+<td>Context 압축</td>
+</tr>
+<tr>
+<td><code>tmp/benchmark-coder-vs-vl.json</code></td>
+<td>Legacy Coder vs VL 속도</td>
+</tr>
+<tr>
+<td><code>tmp/benchmark-*-qwen3627b.log</code></td>
+<td>27B 실행 로그</td>
+</tr>
+</tbody></table>
+
+      <p class="doc-meta">GitHub Markdown CSS + Mermaid.js (browser) · <code>BENCHMARK.md</code></p>
+    </article>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    const SOURCES = [];
+    document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+      SOURCES[i] = el.textContent.trim();
+    });
+
+    function theme() {
+      return document.documentElement.dataset.theme === "dark" ? "dark" : "default";
+    }
+
+    function applyTheme(t) {
+      document.documentElement.dataset.theme = t;
+      document.getElementById("gh-md-light").disabled = t === "dark";
+      document.getElementById("gh-md-dark").disabled = t !== "dark";
+    }
+
+    const saved = localStorage.getItem("md-preview-theme");
+    applyTheme(saved === "light" || saved === "dark"
+      ? saved
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+
+    document.getElementById("theme-toggle").onclick = async () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      applyTheme(next);
+      localStorage.setItem("md-preview-theme", next);
+      await renderAll();
+    };
+
+    async function renderAll() {
+      document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+        el.innerHTML = SOURCES[i];
+        el.removeAttribute("data-processed");
+      });
+
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: theme(),
+        securityLevel: "loose",
+        fontFamily: '"Noto Sans KR", "trebuchet ms", verdana, arial, sans-serif',
+        flowchart: {
+          htmlLabels: true,
+          curve: "basis",
+          padding: 10,
+          nodeSpacing: 35,
+          rankSpacing: 40,
+          useMaxWidth: true,
+          wrappingWidth: 180,
+        },
+        state: {
+          nodeSpacing: 30,
+          rankSpacing: 35,
+          useMaxWidth: true,
+        },
+        sequence: {
+          useMaxWidth: true,
+          wrap: true,
+          width: 120,
+          height: 50,
+          boxMargin: 8,
+        },
+        themeVariables: {
+          fontSize: "14px",
+        },
+      });
+
+      await mermaid.run({ querySelector: ".mermaid" });
+    }
+
+    renderAll().catch((e) => {
+      console.error(e);
+      document.body.insertAdjacentHTML("beforeend",
+        '<p style="color:red;padding:1rem">Mermaid 로드 실패 — 인터넷 연결 확인 또는 <code>./scripts/serve-vision-html.sh</code></p>');
+    });
+  </script>
+</body>
+</html>

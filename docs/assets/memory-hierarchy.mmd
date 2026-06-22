@@ -1,0 +1,17 @@
+flowchart TB
+  RAW["Cursor full history<br/>~80K tokens"]
+  ING["Memory Ingest<br/>adapters.memory · legacy.memory_store"]
+  subgraph tiers["Memory Tiers — cold storage"]
+    SESS["Session Memory<br/>recent dialogue · task state"]
+    ART["Artifact Memory<br/>files · tool results"]
+    VEC["Vector Memory<br/>adapters.retrieval"]
+    POL["Policy Memory<br/>failed actions · bans"]
+  end
+  WS["Working Set Builder<br/>runtime_core.memory_policy"]
+  BUD["Dynamic Budget + Coverage<br/>runtime_core scheduler"]
+  PACK["Prompt Pack<br/>~700 tokens"]
+  GPU["GPU Context / KV Cache"]
+  LLM["Local LLM<br/>adapters.gateway → llama.cpp"]
+
+  RAW --> ING --> tiers
+  tiers --> WS --> BUD --> PACK --> GPU --> LLM

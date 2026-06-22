@@ -1,0 +1,109 @@
+"""Per-turn runtime metrics for inspector, bench, and post-mortem."""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+from typing import Any
+
+LOG = logging.getLogger("router.runtime_turn")
+
+COVERAGE_THRESHOLD = float(os.getenv("COVERAGE_THRESHOLD", "0.75"))
+
+
+def record_runtime_turn(
+    state: Any,
+    *,
+    flow_id: str = "",
+    intent: str = "",
+    phase: str = "",
+    context_need: Any = None,
+    budget_plan: Any = None,
+    retrieval_pack: Any = None,
+    coverage: Any = None,
+    recovery_triggered: bool = False,
+    recovery_recovered: bool = False,
+    recovery_rounds: int = 0,
+    final_blocked_reason: str = "",
+    dynamic_budget_enabled: bool | None = None,
+) -> dict[str, Any]:
+    """Persist turn snapshot on session state and emit structured log."""
+    need_dict = (
+        context_need.to_dict()
+        if hasattr(context_need, "to_dict")
+        else dict(context_need or {})
+    )
+    budget_dict = (
+        budget_plan.to_dict()
+        if hasattr(budget_plan, "to_dict")
+        else dict(budget_plan or {})
+    )
+    coverage_dict = (
+        coverage.to_dict()
+        if hasattr(coverage, "to_dict")
+        else dict(coverage or {})
+    )
+
+    items = getattr(retrieval_pack, "items", None) or []
+    retrieval_items = [
+        {
+            "source": getattr(i, "source", ""),
+            "tokens": getattr(i, "tokens", 0),
+            "score": getattr(i, "score", 0),
+            "section": getattr(i, "section", ""),
+            "must_include": getattr(i, "must_include", False),
+        }
+        for i in items[:12]
+    ]
+
+    turn = {
+        "flow_id": flow_id or getattr(state, "last_run_id", "") or "",
+        "intent": intent or need_dict.get("intent", ""),
+        "phase": phase or "",
+        "dynamic_budget_enabled": dynamic_budget_enabled,
+        "context_need": need_dict,
+        "budget_plan": budget_dict,
+        "retrieval_total_tokens": int(getattr(retrieval_pack, "total_tokens", 0) or 0),
+        "retrieval_items": retrieval_items,
+        "retrieval_missing_targets": list(getattr(retrieval_pack, "missing_targets", None) or []),
+        "coverage_score": float(coverage_dict.get("coverage_score", 1.0) or 1.0),
+        "coverage_complete": bool(coverage_dict.get("complete", True)),
+        "coverage_missing": list(coverage_dict.get("missing") or []),
+        "coverage_truncated": list(coverage_dict.get("truncated") or []),
+        "coverage_action": str(coverage_dict.get("action") or "proceed"),
+        "critical_source_truncated": bool(coverage_dict.get("critical_source_truncated")),
+        "latest_tool_result_missing": bool(coverage_dict.get("latest_tool_result_missing")),
+        "recovery_triggered": recovery_triggered,
+        "recovery_recovered": recovery_recovered,
+        "recovery_rounds": recovery_rounds,
+        "final_blocked_reason": final_blocked_reason or "",
+        "memory_hierarchy": dict(getattr(state, "last_memory_hierarchy", None) or {}),
+    }
+
+    if state is not None:
+        state.last_runtime_turn = turn
+        metrics = dict(getattr(state, "last_ingest_metrics", None) or {})
+        metrics.update({
+            "coverage_score": turn["coverage_score"],
+            "coverage_complete": turn["coverage_complete"],
+            "coverage_missing": turn["coverage_missing"],
+            "recovery_triggered": recovery_triggered,
+            "recovery_recovered": recovery_recovered,
+            "recovery_rounds": recovery_rounds,
+            "retrieval_total_tokens": turn["retrieval_total_tokens"],
+            "budget_mode": budget_dict.get("mode", ""),
+            "final_blocked_reason": final_blocked_reason,
+        })
+        state.last_ingest_metrics = metrics
+
+    LOG.info("runtime_turn %s", json.dumps(turn, ensure_ascii=False, default=str))
+
+    try:
+        from adapters.observe import emit_langfuse_event
+
+        emit_langfuse_event("runtime_turn", turn)
+    except ImportError:
+        pass
+
+    return turn

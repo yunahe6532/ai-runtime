@@ -1,0 +1,31 @@
+{
+  "flowchart": {
+    "padding": 8,
+    "nodeSpacing": 36,
+    "rankSpacing": 40,
+    "htmlLabels": true,
+    "useMaxWidth": true,
+    "wrappingWidth": 140,
+    "curve": "basis"
+  },
+  "state": {
+    "nodeSpacing": 30,
+    "rankSpacing": 35,
+    "padding": 6,
+    "useMaxWidth": true,
+    "dividerMargin": 8
+  },
+  "sequence": {
+    "useMaxWidth": true,
+    "wrap": true,
+    "width": 110,
+    "height": 48,
+    "boxMargin": 8,
+    "messageMargin": 28,
+    "mirrorActors": false
+  },
+  "themeVariables": {
+    "fontSize": "13px",
+    "fontFamily": "\"Noto Sans KR\", sans-serif"
+  }
+}

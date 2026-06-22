@@ -1,0 +1,29 @@
+flowchart TB
+  subgraph problem["Problem — Stateless API"]
+    CUR["Cursor full history<br/>~80K tokens / request"]
+  end
+
+  subgraph runtime["AI Runtime — Memory Hierarchy"]
+    ING["Memory Ingest<br/>session · artifact · vector · policy"]
+    NEED["Need Analysis<br/>must_include · coverage_targets"]
+    RET["Retrieval + Evidence Cluster<br/>canonical keys · dedupe"]
+    WS["Working Set<br/>2–4K GPU tokens"]
+    COV["Coverage + Recovery<br/>fail → symbol slice · no full re-read"]
+  end
+
+  subgraph proof["Verified (2026-06-18)"]
+    M1["raw→GPU ratio ≤ 0.018"]
+    M2["coverage ≥ 1.00"]
+    M3["task / recovery 100%"]
+    M4["re-read live 1.00 · stress 0.80"]
+  end
+
+  LLM["Local LLM<br/>adapters.gateway → llama.cpp"]
+
+  CUR --> ING --> NEED --> RET --> WS --> COV --> LLM
+  COV --> proof
+
+  style problem fill:#fff5f5,stroke:#fc8181
+  style runtime fill:#ebf8ff,stroke:#4299e1
+  style proof fill:#f0fff4,stroke:#48bb78
+  style LLM fill:#faf5ff,stroke:#9f7aea

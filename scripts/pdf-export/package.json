@@ -1,0 +1,11 @@
+{
+  "name": "cursor-local-llm-pdf-export",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@fontsource/noto-sans-kr": "^5.2.9",
+    "@mermaid-js/mermaid-cli": "^11.4.0",
+    "marked": "^15.0.0",
+    "puppeteer": "^24.0.0"
+  }
+}

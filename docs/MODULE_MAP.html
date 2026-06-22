@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MODULE_MAP</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-light.min.css" id="gh-md-light" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-dark.min.css" id="gh-md-dark" disabled />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fff;
+      color-scheme: light;
+    }
+    html[data-theme="dark"] body { background: #0d1117; color-scheme: dark; }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.55rem 1.25rem;
+      border-bottom: 1px solid #d0d7de;
+      background: #f6f8fa;
+      font-size: 0.875rem;
+    }
+    html[data-theme="dark"] .toolbar {
+      border-color: #30363d; background: #161b22; color: #e6edf3;
+    }
+    .toolbar button {
+      font: inherit; cursor: pointer;
+      border: 1px solid #d0d7de; background: #fff;
+      border-radius: 6px; padding: 0.2rem 0.55rem;
+    }
+    html[data-theme="dark"] .toolbar button {
+      border-color: #30363d; background: #21262d; color: #e6edf3;
+    }
+    .toolbar a { color: inherit; opacity: 0.65; text-decoration: none; }
+
+    .page { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    .markdown-body { min-width: 0; }
+
+    /* Cursor MD preview 스타일 Mermaid 카드 */
+    .markdown-body .mermaid-wrap {
+      margin: 0.85rem 0 1.25rem;
+      padding: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    html[data-theme="dark"] .markdown-body .mermaid-wrap {
+      border-color: #30363d; background: #161b22;
+    }
+    .markdown-body pre.mermaid {
+      margin: 0; padding: 0; background: transparent; border: 0;
+      font-family: inherit; text-align: center;
+    }
+    /* Mermaid가 그린 SVG — IDE처럼 컨테이너에 맞춤 (축소 눌림 없음) */
+    .markdown-body .mermaid-wrap svg {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .doc-meta {
+      margin-top: 2rem; padding-top: 1rem;
+      border-top: 1px solid #d0d7de;
+      font-size: 0.8rem; opacity: 0.6;
+    }
+    html[data-theme="dark"] .doc-meta { border-color: #30363d; }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <strong>MODULE_MAP</strong>
+    <span>2026-06-21 · Mermaid 0개</span>
+    <div>
+      <button type="button" id="theme-toggle">🌓</button>
+      <a href="#top">↑</a>
+    </div>
+  </header>
+  <div class="page" id="top">
+    <article class="markdown-body">
+<h1 id="module-map-code-tiers">Module Map — Code Tiers</h1>
+<blockquote>
+<p><code>router/</code> 모듈을 <strong>Build / Buy / Legacy / Reference</strong> 기준으로 분류한다.<br>Build vs Buy 상세 → <a href="./INTEGRATIONS.md">INTEGRATIONS.md</a></p>
+</blockquote>
+<hr>
+<h2 id="tier-0-build-core-ip-runtimecore-orchestrators">Tier 0 — Build (Core IP · `runtime_core/` + orchestrators)</h2>
+<p><strong>직접 개발 · Context Runtime v1 SKU</strong></p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Path</th>
+<th align="center">IP</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ContextNeed</td>
+<td><code>context_need.py</code></td>
+<td align="center">★★★★★</td>
+<td>intent · coverage_targets</td>
+</tr>
+<tr>
+<td>BudgetPlan</td>
+<td><code>context_budget.py</code></td>
+<td align="center">★★★★★</td>
+<td>allocate_dynamic</td>
+</tr>
+<tr>
+<td>Coverage</td>
+<td><code>coverage_checker.py</code></td>
+<td align="center">★★★★★</td>
+<td>truncate audit</td>
+</tr>
+<tr>
+<td>Recovery</td>
+<td><code>recovery_scheduler.py</code></td>
+<td align="center">★★★★★</td>
+<td>bump · re-retrieve</td>
+</tr>
+<tr>
+<td>Scheduler contract</td>
+<td><code>runtime_core/scheduler_contract.py</code></td>
+<td align="center">★★★★★</td>
+<td>Inputs/Outputs</td>
+</tr>
+<tr>
+<td>Orchestrator</td>
+<td><code>dynamic_context_scheduler.py</code></td>
+<td align="center">★★★★★</td>
+<td>turn pipeline</td>
+</tr>
+<tr>
+<td>Prompt pack policy</td>
+<td><code>prompt_builder.py</code></td>
+<td align="center">★★★★☆</td>
+<td>budget-aware pack</td>
+</tr>
+<tr>
+<td>Message index</td>
+<td><code>message_index.py</code></td>
+<td align="center">★★★☆☆</td>
+<td>stable key diff</td>
+</tr>
+<tr>
+<td>Failed action</td>
+<td><code>failed_action.py</code></td>
+<td align="center">★★★☆☆</td>
+<td>cold summary policy</td>
+</tr>
+<tr>
+<td>Turn log</td>
+<td><code>runtime_turn_log.py</code></td>
+<td align="center">★★☆☆☆</td>
+<td>metrics schema</td>
+</tr>
+<tr>
+<td>Inspector</td>
+<td><code>runtime_inspector.py</code></td>
+<td align="center">★★☆☆☆</td>
+<td>dev UX (schema Build)</td>
+</tr>
+<tr>
+<td>Package helpers</td>
+<td><code>runtime_core/indexing_helpers.py</code></td>
+<td align="center">★★★☆☆</td>
+<td>section classify</td>
+</tr>
+<tr>
+<td>Prompt enforcer</td>
+<td><code>runtime_core/prompt_enforcer.py</code></td>
+<td align="center">★★★☆☆</td>
+<td>last-resort guard</td>
+</tr>
+</tbody></table>
+<p>Import (목표):</p>
+<pre><code class="language-python">from runtime_core.scheduler_contract import SchedulerInputs, SchedulerOutputs
+from dynamic_context_scheduler import build_context_for_turn
+</code></pre>
+<hr>
+<h2 id="tier-1-adapters-buy-glue-adapters">Tier 1 — Adapters (Buy glue · `adapters/`)</h2>
+<table>
+<thead>
+<tr>
+<th>Adapter</th>
+<th>Buy</th>
+<th>Legacy fallback</th>
+<th>Env</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>adapters/memory.py</code></td>
+<td>LangGraph checkpoint</td>
+<td><code>legacy/memory_store.py</code></td>
+<td><code>LANGGRAPH_ENABLED</code></td>
+</tr>
+<tr>
+<td><code>adapters/retrieval.py</code></td>
+<td>LlamaIndex</td>
+<td><code>legacy/retriever.py</code></td>
+<td><code>VECTOR_RETRIEVAL</code></td>
+</tr>
+<tr>
+<td><code>adapters/gateway.py</code></td>
+<td>LiteLLM</td>
+<td>httpx direct</td>
+<td><code>LITELLM_ENABLED</code></td>
+</tr>
+<tr>
+<td><code>adapters/trace.py</code></td>
+<td>OpenTelemetry</td>
+<td>JSON backup</td>
+<td><code>OTEL_*</code></td>
+</tr>
+<tr>
+<td><code>adapters/observe.py</code></td>
+<td>Langfuse</td>
+<td><code>legacy/agent_runs.py</code></td>
+<td><code>LANGFUSE_*</code></td>
+</tr>
+<tr>
+<td><code>adapters/langgraph.py</code></td>
+<td>LangGraph store</td>
+<td>file store</td>
+<td><code>LANGGRAPH_ENABLED</code></td>
+</tr>
+<tr>
+<td><code>adapters/mcp.py</code></td>
+<td>MCP (v2)</td>
+<td>—</td>
+<td><code>MCP_ENABLED</code></td>
+</tr>
+</tbody></table>
+<p>Import (목표):</p>
+<pre><code class="language-python">from adapters.memory import SessionState, load_state
+from adapters.retrieval import retrieve_for_need
+from adapters.trace import begin_flow, record_proxy
+</code></pre>
+<hr>
+<h2 id="tier-2-legacy-poc-isolation-legacy">Tier 2 — Legacy (POC isolation · `legacy/`)</h2>
+<p><strong>재발명 지옥 방지 — adapter 뒤로만 접근</strong></p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Was</th>
+<th>Migrate to</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>legacy/memory_store.py</code></td>
+<td>file session DB</td>
+<td>LangGraph via <code>adapters/memory</code></td>
+</tr>
+<tr>
+<td><code>legacy/retriever.py</code></td>
+<td>BM25 + vector merge</td>
+<td>LlamaIndex via <code>adapters/retrieval</code></td>
+</tr>
+<tr>
+<td><code>legacy/agent_runs.py</code></td>
+<td>SSE events</td>
+<td>Langfuse via <code>adapters/observe</code></td>
+</tr>
+<tr>
+<td><code>legacy/context_optimizer.py</code></td>
+<td>static ratios</td>
+<td>dynamic scheduler</td>
+</tr>
+<tr>
+<td><code>legacy/runtime_optimizer.py</code></td>
+<td>blind truncate</td>
+<td>coverage + recovery</td>
+</tr>
+</tbody></table>
+<p>Top-level shims <strong>삭제됨</strong>. Application code → <code>adapters/</code> only. Legacy → <code>legacy/</code> (adapter backend).</p>
+<hr>
+<h2 id="tier-3-reference-integration-agent-runtime-v2">Tier 3 — Reference Integration (Agent Runtime v2)</h2>
+<p><strong>위치</strong>: <code>router/reference/</code></p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>reference/planner.py</code></td>
+<td>AgentPlan</td>
+</tr>
+<tr>
+<td><code>reference/plan_state.py</code></td>
+<td>phase gate</td>
+</tr>
+<tr>
+<td><code>reference/agent_exec.py</code></td>
+<td>tool validation</td>
+</tr>
+<tr>
+<td><code>reference/evidence_*.py</code></td>
+<td>evidence layer</td>
+</tr>
+<tr>
+<td><code>reference/loop_guard.py</code></td>
+<td>final gate</td>
+</tr>
+</tbody></table>
+<p>Agent graph → LangGraph (Buy). Reference = Cursor POC until v2 SKU.</p>
+<hr>
+<h2 id="tier-4-infrastructure-ingress">Tier 4 — Infrastructure (Ingress)</h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Responsibility</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>main.py</code></td>
+<td>HTTP ingress</td>
+<td>→ <code>adapters/gateway</code></td>
+</tr>
+<tr>
+<td><code>intent_router.py</code></td>
+<td>two-pass orchestration</td>
+<td>uses adapters</td>
+</tr>
+<tr>
+<td><code>qwen_request.py</code></td>
+<td>engine kwargs</td>
+<td>Buy engine</td>
+</tr>
+<tr>
+<td><code>context_cache.py</code></td>
+<td>ContextIndex</td>
+<td>ingress cache</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="tier-5-integrations-low-level-stubs-integrations">Tier 5 — Integrations (low-level stubs · `integrations/`)</h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>integrations/llamaindex.py</code></td>
+<td>vector engine</td>
+</tr>
+<tr>
+<td><code>integrations/otel.py</code></td>
+<td>span export</td>
+</tr>
+<tr>
+<td><code>integrations/langfuse.py</code></td>
+<td>observe events</td>
+</tr>
+<tr>
+<td><code>integrations/flow_tracing.py</code></td>
+<td>OTel + JSON</td>
+</tr>
+</tbody></table>
+<p>Used by <code>adapters/</code> — do not import from app code directly.</p>
+<hr>
+<h2 id="dockerfile-copy-우선순위">Dockerfile COPY 우선순위</h2>
+<ol>
+<li>Tier 0 (Build) + Tier 1 (adapters)</li>
+<li>Tier 3 (reference)</li>
+<li>Tier 4 (ingress)</li>
+<li>Tier 2 (legacy) + shims</li>
+</ol>
+<pre><code class="language-dockerfile">COPY runtime_core reference integrations legacy adapters /app/
+</code></pre>
+<hr>
+<h2 id="tests-by-tier">Tests by Tier</h2>
+<table>
+<thead>
+<tr>
+<th>Script</th>
+<th>Tier</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>benchmark-dynamic-budget-matrix.py</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>benchmark-recovery-e2e.py</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>run-vector-e2e.sh</code></td>
+<td>1 (adapter)</td>
+</tr>
+<tr>
+<td><code>test-evidence-judge.py</code></td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>test-flow-tracing.py</code></td>
+<td>1</td>
+</tr>
+</tbody></table>
+<p><em>Last updated: 2026-06-18</em></p>
+
+      <p class="doc-meta">GitHub Markdown CSS + Mermaid.js (browser) · <code>MODULE_MAP.md</code></p>
+    </article>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    const SOURCES = [];
+    document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+      SOURCES[i] = el.textContent.trim();
+    });
+
+    function theme() {
+      return document.documentElement.dataset.theme === "dark" ? "dark" : "default";
+    }
+
+    function applyTheme(t) {
+      document.documentElement.dataset.theme = t;
+      document.getElementById("gh-md-light").disabled = t === "dark";
+      document.getElementById("gh-md-dark").disabled = t !== "dark";
+    }
+
+    const saved = localStorage.getItem("md-preview-theme");
+    applyTheme(saved === "light" || saved === "dark"
+      ? saved
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+
+    document.getElementById("theme-toggle").onclick = async () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      applyTheme(next);
+      localStorage.setItem("md-preview-theme", next);
+      await renderAll();
+    };
+
+    async function renderAll() {
+      document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+        el.innerHTML = SOURCES[i];
+        el.removeAttribute("data-processed");
+      });
+
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: theme(),
+        securityLevel: "loose",
+        fontFamily: '"Noto Sans KR", "trebuchet ms", verdana, arial, sans-serif',
+        flowchart: {
+          htmlLabels: true,
+          curve: "basis",
+          padding: 10,
+          nodeSpacing: 35,
+          rankSpacing: 40,
+          useMaxWidth: true,
+          wrappingWidth: 180,
+        },
+        state: {
+          nodeSpacing: 30,
+          rankSpacing: 35,
+          useMaxWidth: true,
+        },
+        sequence: {
+          useMaxWidth: true,
+          wrap: true,
+          width: 120,
+          height: 50,
+          boxMargin: 8,
+        },
+        themeVariables: {
+          fontSize: "14px",
+        },
+      });
+
+      await mermaid.run({ querySelector: ".mermaid" });
+    }
+
+    renderAll().catch((e) => {
+      console.error(e);
+      document.body.insertAdjacentHTML("beforeend",
+        '<p style="color:red;padding:1rem">Mermaid 로드 실패 — 인터넷 연결 확인 또는 <code>./scripts/serve-vision-html.sh</code></p>');
+    });
+  </script>
+</body>
+</html>

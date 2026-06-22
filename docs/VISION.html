@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VISION</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-light.min.css" id="gh-md-light" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-dark.min.css" id="gh-md-dark" disabled />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fff;
+      color-scheme: light;
+    }
+    html[data-theme="dark"] body { background: #0d1117; color-scheme: dark; }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.55rem 1.25rem;
+      border-bottom: 1px solid #d0d7de;
+      background: #f6f8fa;
+      font-size: 0.875rem;
+    }
+    html[data-theme="dark"] .toolbar {
+      border-color: #30363d; background: #161b22; color: #e6edf3;
+    }
+    .toolbar button {
+      font: inherit; cursor: pointer;
+      border: 1px solid #d0d7de; background: #fff;
+      border-radius: 6px; padding: 0.2rem 0.55rem;
+    }
+    html[data-theme="dark"] .toolbar button {
+      border-color: #30363d; background: #21262d; color: #e6edf3;
+    }
+    .toolbar a { color: inherit; opacity: 0.65; text-decoration: none; }
+
+    .page { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    .markdown-body { min-width: 0; }
+
+    /* Cursor MD preview 스타일 Mermaid 카드 */
+    .markdown-body .mermaid-wrap {
+      margin: 0.85rem 0 1.25rem;
+      padding: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    html[data-theme="dark"] .markdown-body .mermaid-wrap {
+      border-color: #30363d; background: #161b22;
+    }
+    .markdown-body pre.mermaid {
+      margin: 0; padding: 0; background: transparent; border: 0;
+      font-family: inherit; text-align: center;
+    }
+    /* Mermaid가 그린 SVG — IDE처럼 컨테이너에 맞춤 (축소 눌림 없음) */
+    .markdown-body .mermaid-wrap svg {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .doc-meta {
+      margin-top: 2rem; padding-top: 1rem;
+      border-top: 1px solid #d0d7de;
+      font-size: 0.8rem; opacity: 0.6;
+    }
+    html[data-theme="dark"] .doc-meta { border-color: #30363d; }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <strong>VISION</strong>
+    <span>2026-06-21 · Mermaid 11개</span>
+    <div>
+      <button type="button" id="theme-toggle">🌓</button>
+      <a href="#top">↑</a>
+    </div>
+  </header>
+  <div class="page" id="top">
+    <article class="markdown-body">
+<h1 id="ai-runtime-context-runtime-for-every-ide">AI Runtime — Context Runtime for Every IDE</h1>
+<blockquote>
+<p><strong>Context 비용과 Local LLM 실행 효율을 최적화하는 AI 실행 계층</strong></p>
+<p>AI 애플리케이션은 매 요청마다 수십~수백 KB의 컨텍스트를 반복 전송한다. <strong>AI Runtime</strong>은 Application과 Inference Engine 사이에서 Context, Memory, Retrieval, Budget을 <strong>동적으로</strong> 관리하여 비용·지연·OOM을 줄인다.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>제품</strong></td>
+<td><strong>Context Runtime</strong> (v1) — Universal AI Runtime의 첫 SKU</td>
+</tr>
+<tr>
+<td><strong>구현</strong></td>
+<td>Cursor + Local LLM <strong>Runtime Middleware</strong> (참조 구현)</td>
+</tr>
+<tr>
+<td><strong>하지 않는 것</strong></td>
+<td>IDE · Cursor 경쟁 · VSCode Fork · “OS” 브랜딩</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="문서-구조-3분할">문서 구조 (3분할)</h2>
+<table>
+<thead>
+<tr>
+<th>문서</th>
+<th>독자</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><a href="./VISION.md">VISION.md</a></strong> (이 문서)</td>
+<td>투자자 · PM · 파트너</td>
+<td>Problem · Product · Business · Roadmap + <strong>핵심 Flow 요약</strong></td>
+</tr>
+<tr>
+<td><strong><a href="./ARCHITECTURE.md">ARCHITECTURE.md</a></strong></td>
+<td>개발자 · 기술 심사</td>
+<td>Pipeline · Need · Budget · Recovery · Closed Loop · Module Map · Sequence</td>
+</tr>
+<tr>
+<td><strong><a href="./BENCHMARK.md">BENCHMARK.md</a></strong></td>
+<td>검증 · 구매 담당</td>
+<td>수치 · 그래프 · 재현 명령</td>
+</tr>
+</tbody></table>
+<p>기술 심화: <a href="./MODULE_MAP.md">MODULE_MAP.md</a> · <a href="./INTEGRATIONS.md">INTEGRATIONS.md</a></p>
+<hr>
+<h2 id="목차">목차</h2>
+<ol>
+<li><a href="#1-problem--%EC%99%9C-%ED%95%84%EC%9A%94%ED%95%9C%EA%B0%80">Problem — 왜 필요한가</a></li>
+<li><a href="#2-market-pain">Market Pain</a></li>
+<li><a href="#3-why-existing-solutions-fail">Why Existing Solutions Fail</a></li>
+<li><a href="#4-our-runtime--%ED%95%9C-%EC%9E%A5-%EC%9A%94%EC%95%BD">Our Runtime — 한 장 요약</a></li>
+<li><a href="#5-%EC%A0%9C%ED%92%88-%EC%A0%95%EC%9D%98">제품 정의</a></li>
+<li><a href="#6-architecture-snapshot">Architecture Snapshot</a></li>
+<li><a href="#7-benchmark-snapshot">Benchmark Snapshot</a></li>
+<li><a href="#8-business">Business</a></li>
+<li><a href="#9-roadmap">Roadmap</a></li>
+</ol>
+<hr>
+<h2 id="1-problem-왜-필요한가">1. Problem — 왜 필요한가</h2>
+<p>LLM 능력은 빠르게 성장했지만, <strong>실행 스택은 거의 진화하지 못했다.</strong></p>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-1">flowchart TB
+    subgraph before["오늘 (문제)"]
+        App1[IDE / Agent] --&gt; Eng1[Inference Engine]
+        Eng1 --&gt; HW1[GPU]
+    end
+    subgraph after["목표"]
+        App2[IDE / Agent] --&gt; RT[AI Runtime]
+        RT --&gt; Eng2[Inference Engine]
+        Eng2 --&gt; HW2[GPU]
+    end</pre></div>
+<p>Application이 Engine에 직접 붙으면:</p>
+<ul>
+<li>컨텍스트 무한 성장 → <strong>API 비용 · OOM · 지연</strong></li>
+<li>blind truncate → <strong>근거 없는 답</strong></li>
+<li>Agent 반복 Read → <strong>루프 · ping-pong</strong></li>
+</ul>
+<p><strong>cursor-local-llm</strong>은 Cursor 위에서 Context Runtime MVP를 검증하는 <strong>첫 참조 구현</strong>이다.</p>
+<hr>
+<h2 id="2-market-pain">2. Market Pain</h2>
+<h3 id="21-context-비용-v1-1순위">2.1 Context 비용 (v1 — 1순위)</h3>
+<table>
+<thead>
+<tr>
+<th>증상</th>
+<th>원인</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>API 청구서 폭증</td>
+<td>매 요청 200K~600K history 재전송</td>
+</tr>
+<tr>
+<td>Local LLM OOM</td>
+<td>32K ctx에 100K+ prompt</td>
+</tr>
+<tr>
+<td>품질 저하</td>
+<td>truncate 후 “잘렸는지” 모름</td>
+</tr>
+</tbody></table>
+<h3 id="22-agent-실행-v2">2.2 Agent 실행 (v2)</h3>
+<p>Read/Grep 반복 · 조기 final · tool loop — <code>reference/</code> 모듈로 Cursor POC 검증 중.</p>
+<h3 id="23-gpu-v3-enterprise">2.3 GPU (v3 · Enterprise)</h3>
+<p>VRAM · KV · multi-GPU — Enterprise가 먼저 지불.</p>
+<hr>
+<h2 id="3-why-existing-solutions-fail">3. Why Existing Solutions Fail</h2>
+<blockquote>
+<p><strong>같은 계층끼리만 비교한다.</strong> Coverage는 Proxy 기능이 아니다. Delta는 Memory DB가 아니다.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>계층</th>
+<th>기존 (Buy)</th>
+<th>우리 (Build — Policy Layer)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Vector Retrieval</strong></td>
+<td>LlamaIndex, Haystack</td>
+<td><strong>Retrieval Budget Policy</strong> — Need-aware rank · token ceiling</td>
+</tr>
+<tr>
+<td><strong>State Persistence</strong></td>
+<td>LangGraph checkpointer, Letta store</td>
+<td><strong>Context-aware Delta Compression</strong> — history→delta→artifact scheduling</td>
+</tr>
+<tr>
+<td><strong>Memory Runtime</strong></td>
+<td>LangGraph session graph</td>
+<td><strong>Context-aware Memory Scheduling</strong> — hot/cold · artifact priority</td>
+</tr>
+<tr>
+<td><strong>OpenAI Gateway</strong></td>
+<td>LiteLLM, OpenRouter</td>
+<td><strong>Runtime Policy Layer</strong> — Need→Budget→Coverage→Recovery (gateway 위)</td>
+</tr>
+<tr>
+<td><strong>Inference Runtime</strong></td>
+<td>vLLM, llama.cpp, Ollama</td>
+<td>Adapter only — tensor 연산은 Buy</td>
+</tr>
+<tr>
+<td><strong>Tracing / Dashboard</strong></td>
+<td>OpenTelemetry, Langfuse, LangSmith</td>
+<td>Metric schema만 Build · export는 Buy</td>
+</tr>
+<tr>
+<td><strong>Runtime Scheduler</strong></td>
+<td><em>(직접 경쟁 없음)</em></td>
+<td><strong>Context Scheduler</strong> — 핵심 IP</td>
+</tr>
+</tbody></table>
+<p><strong>직접 재개발 금지</strong> — <a href="./INTEGRATIONS.md">INTEGRATIONS.md</a>.<br><strong>Build</strong>: Context Scheduling · Coverage · Recovery · Budget Policy만.<br><strong>Buy</strong>: Gateway · Vector engine · Checkpointer · Trace · Dashboard.</p>
+<p>IDE를 만들지 않는다. Runtime은 <strong>플러그인 + 백그라운드 서비스</strong> (Cursor · VSCode · JetBrains · CLI).</p>
+<h3 id="build-vs-buy-요약">Build vs Buy (요약)</h3>
+<table>
+<thead>
+<tr>
+<th>영역</th>
+<th align="center">Build</th>
+<th align="center">Buy</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Vector engine</td>
+<td align="center">❌</td>
+<td align="center">LlamaIndex / Haystack</td>
+</tr>
+<tr>
+<td>Tracing export</td>
+<td align="center">❌</td>
+<td align="center">OpenTelemetry</td>
+</tr>
+<tr>
+<td>Prompt/provider cache</td>
+<td align="center">❌</td>
+<td align="center">Provider / vLLM</td>
+</tr>
+<tr>
+<td>Memory graph / checkpoint</td>
+<td align="center">❌</td>
+<td align="center">LangGraph</td>
+</tr>
+<tr>
+<td>OpenAI gateway</td>
+<td align="center">❌</td>
+<td align="center">LiteLLM</td>
+</tr>
+<tr>
+<td>Agent state machine</td>
+<td align="center">❌</td>
+<td align="center">LangGraph (v2)</td>
+</tr>
+<tr>
+<td>Dashboard UI</td>
+<td align="center">❌</td>
+<td align="center">Langfuse / Phoenix</td>
+</tr>
+<tr>
+<td><strong>Runtime Scheduler</strong></td>
+<td align="center">✅</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td><strong>Coverage Engine</strong></td>
+<td align="center">✅</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td><strong>Recovery Loop</strong></td>
+<td align="center">✅</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td><strong>Dynamic Budget Policy</strong></td>
+<td align="center">✅</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td><strong>Delta Context Policy</strong></td>
+<td align="center">✅</td>
+<td align="center">—</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="4-our-runtime-한-장-요약">4. Our Runtime — 한 장 요약</h2>
+<blockquote>
+<p>투자자·PM용 <strong>3분 버전</strong>. 상세 Flow · Sequence → <a href="./ARCHITECTURE.md">ARCHITECTURE.md</a></p>
+</blockquote>
+<h3 id="41-problem-answer-마스터-flow">4.1 Problem → Answer (마스터 Flow)</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-2">flowchart TD
+    P[Problem: 100K+ context] --&gt; RT[AI Runtime]
+    RT --&gt; MEM[Memory · Delta]
+    MEM --&gt; NEED[Need Analysis]
+    NEED --&gt; RET[Retriever]
+    RET --&gt; BUD[Dynamic Budget]
+    BUD --&gt; COV[Coverage]
+    COV --&gt;|fail| REC[Recovery]
+    REC --&gt; RET
+    REC --&gt; BUD
+    COV --&gt;|pass| PROMPT[Prompt Pack]
+    PROMPT --&gt; LLM[LLM]
+    LLM --&gt; ANS[Answer / Next Tool]</pre></div>
+<pre><code class="language-text">Problem → Runtime → Memory → Need → Retrieve → Budget → Coverage → Recovery? → LLM → Answer
+</code></pre>
+<h3 id="41b-runtime-왜-각-단계가-있는가">4.1b Runtime — 왜 각 단계가 있는가</h3>
+<pre><code class="language-text">Need        → LLM이 이번 턴에 무엇이 필요한지 결정 (intent · coverage_targets)
+Retrieve    → 필요한 문서·코드·tool 결과만 수집 (vector engine = Buy)
+Measure     → retrieval 실측 token (추정이 아님)
+Allocate    → 32K context window 안에서 slot 재배치 (Dynamic Budget)
+Coverage    → truncate·symbol·must_include 검사 — “잘렸는지” 앎
+Recovery    → 부족하면 budget↑ · re-retrieve · prompt rebuild
+Prompt      → budget-aware pack (단순 template 아님)
+LLM         → Inference engine (Buy: llama.cpp · vLLM · API)
+</code></pre>
+<h3 id="42-runtime-내부-core-ip-우선순위">4.2 Runtime 내부 (Core IP + 우선순위)</h3>
+<pre><code class="language-text">AI Runtime (Context Runtime v1)
+────────────────────────────────
+Message Index
+    ↓
+Memory Store (delta · artifact · session)
+    ↓
+Need Analysis (ContextNeed)
+    ↓
+Retriever (+ optional Vector)
+    ↓
+Dynamic Budget (measure → allocate)
+    ↓
+Coverage Check
+    ↓
+Recovery Loop
+    ↓
+Prompt Builder
+    ↓
+LLM
+    ↓
+Inspector / Turn Log          ★★☆☆☆  (metric schema Build · UI Buy)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Core IP</th>
+<th align="center">중요도</th>
+<th>Build/Buy</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dynamic Budget</td>
+<td align="center">★★★★★</td>
+<td>Build</td>
+</tr>
+<tr>
+<td>Coverage Engine</td>
+<td align="center">★★★★★</td>
+<td>Build</td>
+</tr>
+<tr>
+<td>Recovery Loop</td>
+<td align="center">★★★★★</td>
+<td>Build</td>
+</tr>
+<tr>
+<td>Need Analysis</td>
+<td align="center">★★★★★</td>
+<td>Build</td>
+</tr>
+<tr>
+<td>Delta Context Policy</td>
+<td align="center">★★★★☆</td>
+<td>Build (LangGraph 위 policy)</td>
+</tr>
+<tr>
+<td>Artifact Priority</td>
+<td align="center">★★★★☆</td>
+<td>Build</td>
+</tr>
+<tr>
+<td>Message Index</td>
+<td align="center">★★★☆☆</td>
+<td>Build</td>
+</tr>
+<tr>
+<td>Inspector metrics</td>
+<td align="center">★★☆☆☆</td>
+<td>Build schema · Buy UI</td>
+</tr>
+</tbody></table>
+<h3 id="42b-context-scheduler-inputs-outputs">4.2b Context Scheduler — Inputs / Outputs</h3>
+<p>Scheduler는 “Budget” 라벨만으로는 설명되지 않는다. <strong>입력·출력 계약</strong>이 있다.</p>
+<pre><code class="language-text">Inputs                          Outputs (token budget per slot)
+────────────────────────        ────────────────────────────────
+Intent                          History      (session_tail + delta)
+Phase                           Retrieved
+Retrieved Tokens (measured)     Artifact
+Coverage Score / Complete       Memory       (state slot)
+GPU Backend                     Output Tokens
+Context Window (32K)            System · Plan · Current Task
+Max Output Tokens
+Recovery Round
+</code></pre>
+<p>구현: <code>runtime_core/scheduler_contract.py</code> · 오케스트레이션: <code>dynamic_context_scheduler.py</code></p>
+<h3 id="43-dynamic-budget-핵심-ip-왜-우리인가">4.3 Dynamic Budget — 핵심 IP (왜 우리인가)</h3>
+<p>Budget은 설정값이 아니라 <strong>실행 정책</strong>이다.</p>
+<pre><code class="language-text">Question
+    ↓
+Need Analysis        ← intent · coverage_targets · must_include
+    ↓
+Retriever            ← artifact + vector, 실측 token
+    ↓
+Measure              ← retrieval_total_tokens
+    ↓
+Allocate             ← allocate_dynamic (NOT static ratio)
+    ↓
+Coverage             ← symbol · truncation · evidence
+    ↓
+Recovery (if fail)   ← budget+ → re-retrieve → rebuild
+    ↓
+Prompt → LLM
+</code></pre>
+<p>Intent 예: <strong>recall</strong> → session_tail↑ · <strong>bugfix</strong> → retrieved↑ + <code>file.py::func</code> coverage</p>
+<h3 id="44-recovery-loop">4.4 Recovery Loop</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-3">flowchart LR
+    CF[Coverage Fail] --&gt; BU[Budget +25%]
+    BU --&gt; RR[Re-Retrieve]
+    RR --&gt; RB[Prompt Rebuild]
+    RB --&gt; CP{Coverage Pass?}
+    CP --&gt;|No| CF
+    CP --&gt;|Yes| FIN[Final Allowed]</pre></div>
+<p>E2E 검증: <code>scripts/benchmark-recovery-e2e.py</code> ✅</p>
+<h3 id="45-memory-layer">4.5 Memory Layer</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-4">flowchart LR
+    H[Cursor History 100K+] --&gt; IDX[Message Index]
+    IDX --&gt; D[Delta]
+    D --&gt; A[Artifact Store]
+    A --&gt; PP[Prompt Pack ~0.6–10K]
+    PP --&gt; LLM[LLM]</pre></div>
+<table>
+<thead>
+<tr>
+<th>계층</th>
+<th>Hot</th>
+<th>Cold</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>메시지</td>
+<td>delta tail</td>
+<td>message_keys snapshot</td>
+</tr>
+<tr>
+<td>컨텍스트</td>
+<td>incremental index</td>
+<td>rebuild on mismatch</td>
+</tr>
+<tr>
+<td>실패 tool</td>
+<td>cold summary</td>
+<td>failed_tool_summaries</td>
+</tr>
+</tbody></table>
+<h3 id="46-closed-loop-v1-v2-reference">4.6 Closed Loop (v1 + v2 reference)</h3>
+<p>Context Runtime v1은 <strong>Coverage → Recovery</strong>까지. Agent judge는 v2 reference.</p>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-5">flowchart TD
+    Q[Question] --&gt; N[Need]
+    N --&gt; R[Retrieve]
+    R --&gt; C[Coverage]
+    C --&gt;|fail| REC[Recovery]
+    REC --&gt; R
+    C --&gt;|pass| PR[Prompt]
+    PR --&gt; L[LLM]
+    L --&gt; J[Judge · v2]
+    J --&gt; E{Enough?}
+    E --&gt;|No| N
+    E --&gt;|Yes| F[Final]</pre></div>
+<p>전체 Sequence · 19단계 파이프라인 → <a href="./ARCHITECTURE.md">ARCHITECTURE.md §2–§6</a></p>
+<hr>
+<h2 id="5-제품-정의">5. 제품 정의</h2>
+<blockquote>
+<p><strong>AI Runtime</strong> = Universal Middleware · <strong>v1 SKU = Context Runtime</strong></p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th align="center">버전</th>
+<th>SKU</th>
+<th>Pain</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center"><strong>v1</strong></td>
+<td><strong>Context Runtime</strong></td>
+<td>Context/API cost, OOM</td>
+</tr>
+<tr>
+<td align="center">v2</td>
+<td>Agent Runtime</td>
+<td>tool loop, evidence</td>
+</tr>
+<tr>
+<td align="center">v3</td>
+<td>GPU Runtime</td>
+<td>VRAM, KV</td>
+</tr>
+<tr>
+<td align="center">v4</td>
+<td>Enterprise Runtime</td>
+<td>on-prem, policy</td>
+</tr>
+</tbody></table>
+<pre><code class="language-text">백그라운드 Runtime (:8080, OpenAI-compatible)
+    ↑
+Cursor · Continue · CLI · JetBrains plugin
+</code></pre>
+<hr>
+<h2 id="6-architecture-snapshot">6. Architecture Snapshot</h2>
+<h3 id="60-reference-architecture-한-장">6.0 Reference Architecture (한 장)</h3>
+<blockquote>
+<p><strong>우리는 IDE도 아니고 모델도 아니다. 그 사이의 Runtime Policy Layer.</strong></p>
+</blockquote>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-6">flowchart TB
+    subgraph apps["Applications"]
+        C[Cursor]
+        CC[Claude Code]
+        CO[Continue]
+        JB[JetBrains]
+        CLI[CLI Agent]
+    end
+    subgraph rt["AI Runtime — Policy Layer (Build)"]
+        direction TB
+        NEED[ContextNeed]
+        BUD[Dynamic Budget]
+        COV[Coverage]
+        REC[Recovery]
+    end
+    subgraph adapters["Adapters (Buy)"]
+        LG[LangGraph checkpoint]
+        LI[LlamaIndex retrieval]
+        OT[OpenTelemetry]
+        LF[Langfuse]
+        GW[LiteLLM gateway]
+    end
+    subgraph engines["Inference Engines (Buy)"]
+        OAI[OpenAI · Anthropic]
+        VLLM[vLLM · Ollama]
+        LLM[llama.cpp · TensorRT]
+    end
+    apps --&gt; rt
+    rt --&gt; adapters
+    adapters --&gt; engines
+    engines --&gt; GPU[GPU]</pre></div>
+<pre><code class="language-text">IDE / Agent  →  Runtime Policy  →  Adapters  →  LLM Engine  →  GPU
+(Build)          (Build)            (Buy)         (Buy)
+</code></pre>
+<p>코드 구조: <code>runtime_core/</code> (Build) · <code>adapters/</code> (Buy) · <code>legacy/</code> (POC shim) · <code>reference/</code> (Cursor v2)</p>
+<h3 id="61-네-계층">6.1 네 계층</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-7">flowchart TB
+    IDE[Application] --&gt; RT[AI Runtime]
+    RT --&gt; ENG[Inference Engine]
+    ENG --&gt; HW[Hardware]</pre></div>
+<h3 id="62-module-map-간략">6.2 Module Map (간략)</h3>
+<pre><code class="language-text">runtime_core/     ContextNeed · Budget · Coverage · Recovery · Scheduler contract  (Build)
+adapters/         memory · retrieval · gateway · trace · langgraph · mcp         (Buy glue)
+legacy/           POC backend — memory_store · retriever · agent_runs (adapter만 접근)
+reference/        v2 Agent POC
+integrations/     llamaindex · otel · langfuse
+</code></pre>
+<p><strong>Import 규칙</strong>: app 코드 → <code>adapters/</code> · engine/backend → <code>legacy/</code> · Core IP → flat + <code>runtime_core/</code></p>
+<p>상세 모듈表 → <a href="./ARCHITECTURE.md">ARCHITECTURE.md §7</a> · <a href="./MODULE_MAP.md">MODULE_MAP.md</a></p>
+<hr>
+<h2 id="7-benchmark-snapshot">7. Benchmark Snapshot</h2>
+<h3 id="71-context-압축-funnel">7.1 Context 압축 Funnel</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-8">flowchart LR
+    C[Cursor 103K] --&gt; RT[Runtime ~10K]
+    RT --&gt; DYN[Dynamic Pack ~3K]
+    DYN --&gt; OUT[LLM effective ~0.6–2K]</pre></div>
+<h3 id="72-runtime-success">7.2 Runtime Success</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-9">flowchart LR
+    N[Naive 79%] --&gt; M[Memory proxy]
+    M --&gt; P1[P1 + judge]
+    P1 --&gt; OK[100% 20 tasks]</pre></div>
+<table>
+<thead>
+<tr>
+<th>지표</th>
+<th align="center">Before</th>
+<th align="center">After (p1)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Context</td>
+<td align="center">103K</td>
+<td align="center"><strong>~10K (−90%)</strong></td>
+</tr>
+<tr>
+<td>Runtime success</td>
+<td align="center">79%</td>
+<td align="center"><strong>100%</strong></td>
+</tr>
+<tr>
+<td>Tool calls / task</td>
+<td align="center">3.03</td>
+<td align="center"><strong>0.6</strong></td>
+</tr>
+<tr>
+<td>Recovery E2E</td>
+<td align="center">—</td>
+<td align="center"><strong>pass</strong></td>
+</tr>
+</tbody></table>
+<p>전체 표 · 그래프 · 재현 → <a href="./BENCHMARK.md">BENCHMARK.md</a></p>
+<pre><code class="language-bash">python3 scripts/benchmark-dynamic-budget-matrix.py   # 25 cases
+python3 scripts/benchmark-recovery-e2e.py
+bash scripts/run-vector-e2e.sh                       # 115 artifacts
+</code></pre>
+<hr>
+<h2 id="8-business">8. Business</h2>
+<h3 id="81-누가-돈을-내는가">8.1 누가 돈을 내는가</h3>
+<table>
+<thead>
+<tr>
+<th>세그먼트</th>
+<th>SKU</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>API 팀 (GPT/Claude)</td>
+<td>v1 Context Runtime</td>
+</tr>
+<tr>
+<td>Local LLM 사용자</td>
+<td>v1</td>
+</tr>
+<tr>
+<td>Agent 팀</td>
+<td>v2</td>
+</tr>
+<tr>
+<td>Enterprise GPU farm</td>
+<td>v3–v4</td>
+</tr>
+</tbody></table>
+<h3 id="82-경쟁-같은-계층">8.2 경쟁 (같은 계층)</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">Context Policy</th>
+<th align="center">Runtime Scheduler</th>
+<th align="center">Coverage/Recovery</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cursor (built-in)</td>
+<td align="center">△</td>
+<td align="center">❌</td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td>LiteLLM (gateway)</td>
+<td align="center">❌</td>
+<td align="center">❌</td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td>LlamaIndex (retrieval)</td>
+<td align="center">△ rank only</td>
+<td align="center">❌</td>
+<td align="center">△</td>
+</tr>
+<tr>
+<td>LangGraph (agent graph)</td>
+<td align="center">△ state</td>
+<td align="center">❌</td>
+<td align="center">△</td>
+</tr>
+<tr>
+<td><strong>AI Runtime v1</strong></td>
+<td align="center">✅</td>
+<td align="center">✅</td>
+<td align="center">✅</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="9-roadmap">9. Roadmap</h2>
+<h3 id="91-product-sku">9.1 Product SKU</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-10">flowchart LR
+    V1[v1 Context Runtime] --&gt; V2[v2 Agent Runtime]
+    V2 --&gt; V3[v3 GPU Runtime]
+    V3 --&gt; V4[v4 Enterprise]</pre></div>
+<h3 id="92-go-to-market">9.2 Go-to-Market</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-11">flowchart LR
+    PL[Plugin / Middleware] --&gt; SDK[Runtime SDK]
+    SDK --&gt; CL[Cloud Runtime]
+    CL --&gt; ENT[Enterprise]</pre></div>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>산출물</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>지금</strong></td>
+<td>Cursor middleware + OpenAI API</td>
+</tr>
+<tr>
+<td>Plugin</td>
+<td>VSCode · JetBrains · CLI daemon</td>
+</tr>
+<tr>
+<td>SDK</td>
+<td><code>@cursor/sdk</code> style runtime client</td>
+</tr>
+<tr>
+<td>Cloud</td>
+<td>hosted context policy</td>
+</tr>
+<tr>
+<td>Enterprise</td>
+<td>on-prem · SSO · policy console</td>
+</tr>
+</tbody></table>
+<h3 id="93-v1-엔지니어링-상태">9.3 v1 엔지니어링 상태</h3>
+<table>
+<thead>
+<tr>
+<th>Core IP</th>
+<th align="center">상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dynamic Budget + ContextNeed</td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td>Coverage + Recovery E2E</td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td>Vector retrieval E2E (115 artifacts)</td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td>Inspector + OTel flow</td>
+<td align="center">✅</td>
+</tr>
+<tr>
+<td>Agent layer (reference/)</td>
+<td align="center">▶ v2 분리</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="관련-문서">관련 문서</h2>
+<table>
+<thead>
+<tr>
+<th>문서</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="./ARCHITECTURE.md">ARCHITECTURE.md</a></td>
+<td><strong>기술 심화</strong> — Flow, Closed Loop, Sequence</td>
+</tr>
+<tr>
+<td><a href="./BENCHMARK.md">BENCHMARK.md</a></td>
+<td><strong>객관 근거</strong> — 변천사, 그래프</td>
+</tr>
+<tr>
+<td><a href="./MODULE_MAP.md">MODULE_MAP.md</a></td>
+<td>코드 계층</td>
+</tr>
+<tr>
+<td><a href="./INTEGRATIONS.md">INTEGRATIONS.md</a></td>
+<td>Build vs Buy</td>
+</tr>
+<tr>
+<td><a href="./archive/VISION-os-era-2026-06.md">archive/VISION-os-era-2026-06.md</a></td>
+<td>OS-era 아카이브</td>
+</tr>
+</tbody></table>
+<hr>
+<p><em>Last updated: 2026-06-18 — Build vs Buy layer alignment · Scheduler I/O · Reference Architecture</em></p>
+
+      <p class="doc-meta">GitHub Markdown CSS + Mermaid.js (browser) · <code>VISION.md</code></p>
+    </article>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    const SOURCES = [];
+    document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+      SOURCES[i] = el.textContent.trim();
+    });
+
+    function theme() {
+      return document.documentElement.dataset.theme === "dark" ? "dark" : "default";
+    }
+
+    function applyTheme(t) {
+      document.documentElement.dataset.theme = t;
+      document.getElementById("gh-md-light").disabled = t === "dark";
+      document.getElementById("gh-md-dark").disabled = t !== "dark";
+    }
+
+    const saved = localStorage.getItem("md-preview-theme");
+    applyTheme(saved === "light" || saved === "dark"
+      ? saved
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+
+    document.getElementById("theme-toggle").onclick = async () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      applyTheme(next);
+      localStorage.setItem("md-preview-theme", next);
+      await renderAll();
+    };
+
+    async function renderAll() {
+      document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+        el.innerHTML = SOURCES[i];
+        el.removeAttribute("data-processed");
+      });
+
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: theme(),
+        securityLevel: "loose",
+        fontFamily: '"Noto Sans KR", "trebuchet ms", verdana, arial, sans-serif',
+        flowchart: {
+          htmlLabels: true,
+          curve: "basis",
+          padding: 10,
+          nodeSpacing: 35,
+          rankSpacing: 40,
+          useMaxWidth: true,
+          wrappingWidth: 180,
+        },
+        state: {
+          nodeSpacing: 30,
+          rankSpacing: 35,
+          useMaxWidth: true,
+        },
+        sequence: {
+          useMaxWidth: true,
+          wrap: true,
+          width: 120,
+          height: 50,
+          boxMargin: 8,
+        },
+        themeVariables: {
+          fontSize: "14px",
+        },
+      });
+
+      await mermaid.run({ querySelector: ".mermaid" });
+    }
+
+    renderAll().catch((e) => {
+      console.error(e);
+      document.body.insertAdjacentHTML("beforeend",
+        '<p style="color:red;padding:1rem">Mermaid 로드 실패 — 인터넷 연결 확인 또는 <code>./scripts/serve-vision-html.sh</code></p>');
+    });
+  </script>
+</body>
+</html>

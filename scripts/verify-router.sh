@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Pre-deploy gate: run all router unit/smoke tests. Exit non-zero on any failure.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+echo "=== verify-router.sh ==="
+python3 scripts/benchmark-read-only-analysis-regression.py
+python3 scripts/test-resolve-agent-phase-smoke.py
+python3 scripts/test-evidence-judge.py
+python3 scripts/test-runtime-inspector.py
+python3 scripts/test-agent-exec.py
+python3 scripts/test-artifact-excerpt.py
+echo "=== ALL VERIFY PASS ==="

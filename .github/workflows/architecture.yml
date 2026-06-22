@@ -1,0 +1,48 @@
+name: Architecture
+
+on:
+  push:
+    paths:
+      - "router/**"
+      - "scripts/check-architecture-boundary.py"
+      - "scripts/generate-dependency-graph.py"
+      - "scripts/test-architecture-boundary.py"
+      - "scripts/benchmark-memory-hierarchy.py"
+      - "scripts/benchmark-repeated-read-avoidance.py"
+  pull_request:
+    paths:
+      - "router/**"
+      - "scripts/**"
+      - "docs/**"
+
+jobs:
+  boundary-and-graph:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install optional deps
+        run: |
+          pip install -q httpx opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-http langgraph langgraph-checkpoint-sqlite || true
+
+      - name: Architecture boundary
+        run: python3 scripts/check-architecture-boundary.py
+
+      - name: Memory hierarchy quality gate
+        run: python3 scripts/benchmark-memory-hierarchy.py --quality-gate
+
+      - name: Repeated read avoidance gate
+        run: python3 scripts/benchmark-repeated-read-avoidance.py
+
+      - name: Memory backend swap benchmark
+        run: python3 scripts/benchmark-memory-backend-swap.py
+
+      - name: Dependency graph generate + verify
+        run: python3 scripts/generate-dependency-graph.py --verify
+
+      - name: Pytest architecture wrapper
+        run: python3 scripts/test-architecture-boundary.py

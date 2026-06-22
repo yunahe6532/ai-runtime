@@ -1,0 +1,177 @@
+x-llama-coder: &llama-coder
+  image: ghcr.io/ggml-org/llama.cpp:server-cuda
+  restart: "no"
+  volumes:
+    - "${CODER_MODEL_FILE}:/models/model.gguf:ro"
+    - "${MMPROJ_FILE:-/etc/hosts}:/models/mmproj.gguf:ro"
+  environment: &llama-env-common
+    GPU_LAYERS: "${GPU_LAYERS:--1}"
+    MMPROJ_FILE: "${MMPROJ_FILE:-}"
+    SPLIT_MODE: "${SPLIT_MODE:-layer}"
+    MAIN_GPU: "${MAIN_GPU:-1}"
+  entrypoint:
+    - /bin/sh
+    - -lc
+  command:
+    - |
+      exec /app/llama-server -m /models/model.gguf --host 0.0.0.0 --port "$${PORT}" --ctx-size "$${CONTEXT_SIZE}" --n-gpu-layers "$${GPU_LAYERS}" --split-mode "$${SPLIT_MODE}" --main-gpu "$${MAIN_GPU}" $$(if [ -n "$${PARALLEL}" ]; then echo "--parallel $${PARALLEL}"; fi) $$(if [ -n "$${THREADS}" ]; then echo "--threads $${THREADS}"; fi) $$(if [ -n "$${THREADS_BATCH}" ]; then echo "--threads-batch $${THREADS_BATCH}"; fi) $$(if [ "$${NO_KV_OFFLOAD}" = "1" ]; then echo "--no-kv-offload"; fi) $$(if [ -n "$${CACHE_TYPE_K}" ]; then echo "--cache-type-k $${CACHE_TYPE_K}"; fi) $$(if [ -n "$${CACHE_TYPE_V}" ]; then echo "--cache-type-v $${CACHE_TYPE_V}"; fi) $$(if [ -n "$${CACHE_RAM}" ]; then echo "--cache-ram $${CACHE_RAM}"; fi) $$(if [ -n "$${MMPROJ_FILE}" ]; then echo "--mmproj /models/mmproj.gguf"; fi) $$(if [ -n "$${TENSOR_SPLIT}" ]; then echo "--tensor-split $${TENSOR_SPLIT}"; fi) $$(if [ -n "$${TOOL_CALL_PARSER}" ]; then echo "--tool-call-parser $${TOOL_CALL_PARSER}"; fi) $$(if [ -n "$${REASONING_PARSER}" ]; then echo "--reasoning-parser $${REASONING_PARSER}"; fi) --jinja
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+  gpus: all
+  healthcheck:
+    test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:$${PORT}/v1/models >/dev/null 2>&1 || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 5
+    start_period: 180s
+
+x-llama-vl: &llama-vl
+  image: ghcr.io/ggml-org/llama.cpp:server-cuda
+  restart: "no"
+  volumes:
+    - "${VL_MODEL_FILE}:/models/model.gguf:ro"
+    - "${VL_MMPROJ_FILE}:/models/mmproj.gguf:ro"
+  environment:
+    <<: *llama-env-common
+    MMPROJ_FILE: "/models/mmproj.gguf"
+  entrypoint:
+    - /bin/sh
+    - -lc
+  command:
+    - |
+      exec /app/llama-server -m /models/model.gguf --host 0.0.0.0 --port "$${PORT}" --ctx-size "$${CONTEXT_SIZE}" --n-gpu-layers "$${GPU_LAYERS}" --split-mode "$${SPLIT_MODE}" --main-gpu "$${MAIN_GPU}" --mmproj /models/mmproj.gguf $$(if [ -n "$${PARALLEL}" ]; then echo "--parallel $${PARALLEL}"; fi) $$(if [ -n "$${THREADS}" ]; then echo "--threads $${THREADS}"; fi) $$(if [ -n "$${THREADS_BATCH}" ]; then echo "--threads-batch $${THREADS_BATCH}"; fi) $$(if [ -n "$${TENSOR_SPLIT}" ]; then echo "--tensor-split $${TENSOR_SPLIT}"; fi)
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+  gpus: all
+  healthcheck:
+    test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:$${PORT}/v1/models >/dev/null 2>&1 || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 5
+    start_period: 180s
+
+services:
+  router:
+    build:
+      context: ./router
+    container_name: cursor-local-llm-router
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "${CAPTURE_HOST_DIR:-./tmp/cursor-captures}:/captures"
+      - "${CONTEXT_CACHE_HOST_DIR:-./tmp/context-cache}:/context-cache"
+    environment:
+      ROUTER_HOST: "0.0.0.0"
+      ROUTER_PORT: "8080"
+      FAST_URL: "http://llama-fast:8081"
+      LONG_URL: "http://llama-long:8082"
+      VL_URL: "http://llama-vl:8083"
+      FAST_CONTAINER: "cursor-local-llm-fast"
+      LONG_CONTAINER: "cursor-local-llm-long"
+      VL_CONTAINER: "cursor-local-llm-vl"
+      VL_PASS_ENABLED: "${VL_PASS_ENABLED:-1}"
+      VL_PASS_MAX_TOKENS: "${VL_PASS_MAX_TOKENS:-1024}"
+      TOKEN_THRESHOLD: "${TOKEN_THRESHOLD:-20000}"
+      LONG_IDLE_TTL_SEC: "${LONG_IDLE_TTL_SEC:-900}"
+      ROUTER_EXCLUSIVE: "${ROUTER_EXCLUSIVE:-1}"
+      DEFAULT_BACKEND: "${DEFAULT_BACKEND:-fast}"
+      ROUTER_MAIN_BACKEND: "${ROUTER_MAIN_BACKEND:-fast}"
+      FINAL_ANSWER_FAST_THRESHOLD: "${FINAL_ANSWER_FAST_THRESHOLD:-6000}"
+      TOOL_PLANNING_MAX_TOKENS: "${TOOL_PLANNING_MAX_TOKENS:-800}"
+      MIN_TOOL_CALLS_FOR_FINAL_ANSWER: "${MIN_TOOL_CALLS_FOR_FINAL_ANSWER:-3}"
+      FINAL_ANSWER_MAX_CHARS: "${FINAL_ANSWER_MAX_CHARS:-24000}"
+      FINAL_ANSWER_PER_TOOL_CHARS: "${FINAL_ANSWER_PER_TOOL_CHARS:-6000}"
+      RECENT_AGENT_MSG_KEEP: "${RECENT_AGENT_MSG_KEEP:-8}"
+      RECENT_AGENT_MSG_CHARS: "${RECENT_AGENT_MSG_CHARS:-8000}"
+      LONG_CTX_TOKENS: "${LONG_CONTEXT_SIZE:-32768}"
+      TOOL_TAIL_MAX_CHARS: "${TOOL_TAIL_MAX_CHARS:-1200}"
+      RUNTIME_OPTIMIZER: "${RUNTIME_OPTIMIZER:-1}"
+      BACKEND_READY_TIMEOUT_SEC: "${BACKEND_READY_TIMEOUT_SEC:-300}"
+      CAPTURE_REQUESTS: "${CAPTURE_REQUESTS:-0}"
+      FLOW_TRACE: "${FLOW_TRACE:-1}"
+      FLOW_SAVE_BODY: "${FLOW_SAVE_BODY:-0}"
+      MEMORY_STORE: "${MEMORY_STORE:-1}"
+      CAPTURE_DIR: "/captures"
+      EXPLORER_TRACE_ENABLED: "${EXPLORER_TRACE_ENABLED:-1}"
+      EXPLORER_TRACE_PATH: "${EXPLORER_TRACE_PATH:-/captures/explorer-trace.ndjson}"
+      EXPLORER_TRACE_FORMAT: "${EXPLORER_TRACE_FORMAT:-both}"
+      EXPLORER_TRACE_STDOUT: "${EXPLORER_TRACE_STDOUT:-1}"
+      TWO_PASS_ROUTER: "${TWO_PASS_ROUTER:-1}"
+      ROUTER_MODE: "${ROUTER_MODE:-legacy}"
+      MULTIMODAL_BACKEND: "${MULTIMODAL_BACKEND:-}"
+      EXPLAIN_MIN_MAX_TOKENS: "${EXPLAIN_MIN_MAX_TOKENS:-256}"
+      CONTEXT_CACHE_DIR: "/context-cache"
+      INTENT_BUDGET_TOKENS: "${INTENT_BUDGET_TOKENS:-8000}"
+      CONTEXT_PACK_BUDGET: "${CONTEXT_PACK_BUDGET:-12000}"
+      CONTEXT_OPTIMIZER: "${CONTEXT_OPTIMIZER:-1}"
+      OPTIMIZER_MODE: "${OPTIMIZER_MODE:-lite_pack}"
+      OPTIMIZER_RECENT_USER_KEEP: "${OPTIMIZER_RECENT_USER_KEEP:-2}"
+      OPTIMIZER_RECENT_ASSISTANT_KEEP: "${OPTIMIZER_RECENT_ASSISTANT_KEEP:-1}"
+    # depends_on intentionally removed: router manages backends via Docker socket dynamically
+
+  llama-fast:
+    <<: *llama-coder
+    container_name: cursor-local-llm-fast
+    environment:
+      <<: *llama-env-common
+      PORT: "8081"
+      CONTEXT_SIZE: "${FAST_CONTEXT_SIZE:-24576}"
+      PARALLEL: "${FAST_PARALLEL:-1}"
+      TENSOR_SPLIT: "${FAST_TENSOR_SPLIT:-50,50}"
+      NO_KV_OFFLOAD: ""
+      CACHE_TYPE_K: ""
+      CACHE_TYPE_V: ""
+      CACHE_RAM: ""
+      THREADS: "${FAST_THREADS:-16}"
+      THREADS_BATCH: "${FAST_THREADS_BATCH:-16}"
+
+  llama-long:
+    <<: *llama-coder
+    container_name: cursor-local-llm-long
+    profiles:
+      - long
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:$${PORT}/v1/models >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    environment:
+      <<: *llama-env-common
+      PORT: "8082"
+      CONTEXT_SIZE: "${LONG_CONTEXT_SIZE:-200000}"
+      PARALLEL: "${LONG_PARALLEL:-1}"
+      TENSOR_SPLIT: "${LONG_TENSOR_SPLIT:-50,50}"
+      NO_KV_OFFLOAD: "${LONG_NO_KV_OFFLOAD:-}"
+      CACHE_TYPE_K: "${LONG_CACHE_TYPE_K:-}"
+      CACHE_TYPE_V: "${LONG_CACHE_TYPE_V:-}"
+      CACHE_RAM: "${LONG_CACHE_RAM:-0}"
+      TOOL_CALL_PARSER: "${TOOL_CALL_PARSER:-}"
+      REASONING_PARSER: "${REASONING_PARSER:-}"
+      THREADS: "${LONG_THREADS:-16}"
+      THREADS_BATCH: "${LONG_THREADS_BATCH:-16}"
+
+  llama-vl:
+    <<: *llama-vl
+    container_name: cursor-local-llm-vl
+    environment:
+      <<: *llama-env-common
+      MMPROJ_FILE: "/models/mmproj.gguf"
+      PORT: "8083"
+      CONTEXT_SIZE: "${VL_CONTEXT_SIZE:-32768}"
+      PARALLEL: "${VL_PARALLEL:-1}"
+      TENSOR_SPLIT: "${VL_TENSOR_SPLIT:-50,50}"
+      THREADS: "${VL_THREADS:-16}"
+      THREADS_BATCH: "${VL_THREADS_BATCH:-16}"

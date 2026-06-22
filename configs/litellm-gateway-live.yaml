@@ -1,0 +1,7 @@
+# LiteLLM proxy for gateway live benchmark — forwards to llama-long OpenAI API.
+model_list:
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/model.gguf
+      api_base: http://llama-long:8082/v1
+      api_key: sk-local

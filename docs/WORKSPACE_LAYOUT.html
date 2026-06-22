@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WORKSPACE_LAYOUT</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-light.min.css" id="gh-md-light" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-dark.min.css" id="gh-md-dark" disabled />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fff;
+      color-scheme: light;
+    }
+    html[data-theme="dark"] body { background: #0d1117; color-scheme: dark; }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.55rem 1.25rem;
+      border-bottom: 1px solid #d0d7de;
+      background: #f6f8fa;
+      font-size: 0.875rem;
+    }
+    html[data-theme="dark"] .toolbar {
+      border-color: #30363d; background: #161b22; color: #e6edf3;
+    }
+    .toolbar button {
+      font: inherit; cursor: pointer;
+      border: 1px solid #d0d7de; background: #fff;
+      border-radius: 6px; padding: 0.2rem 0.55rem;
+    }
+    html[data-theme="dark"] .toolbar button {
+      border-color: #30363d; background: #21262d; color: #e6edf3;
+    }
+    .toolbar a { color: inherit; opacity: 0.65; text-decoration: none; }
+
+    .page { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    .markdown-body { min-width: 0; }
+
+    /* Cursor MD preview 스타일 Mermaid 카드 */
+    .markdown-body .mermaid-wrap {
+      margin: 0.85rem 0 1.25rem;
+      padding: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    html[data-theme="dark"] .markdown-body .mermaid-wrap {
+      border-color: #30363d; background: #161b22;
+    }
+    .markdown-body pre.mermaid {
+      margin: 0; padding: 0; background: transparent; border: 0;
+      font-family: inherit; text-align: center;
+    }
+    /* Mermaid가 그린 SVG — IDE처럼 컨테이너에 맞춤 (축소 눌림 없음) */
+    .markdown-body .mermaid-wrap svg {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .doc-meta {
+      margin-top: 2rem; padding-top: 1rem;
+      border-top: 1px solid #d0d7de;
+      font-size: 0.8rem; opacity: 0.6;
+    }
+    html[data-theme="dark"] .doc-meta { border-color: #30363d; }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <strong>WORKSPACE_LAYOUT</strong>
+    <span>2026-06-21 · Mermaid 0개</span>
+    <div>
+      <button type="button" id="theme-toggle">🌓</button>
+      <a href="#top">↑</a>
+    </div>
+  </header>
+  <div class="page" id="top">
+    <article class="markdown-body">
+<h1 id="워크스페이스-디렉토리-정리">워크스페이스 / 디렉토리 정리</h1>
+<p><code>/home/yunahe</code>는 <strong>공용 홈</strong>이고, 이 프로젝트 루트는 <strong><code>/home/yunahe/ai-runtime/cursor-local-llm</code></strong> 입니다.</p>
+<hr>
+<h2 id="원칙">원칙</h2>
+<table>
+<thead>
+<tr>
+<th>위치</th>
+<th>용도</th>
+<th>이동</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>~/ai-runtime/cursor-local-llm/</code></td>
+<td><strong>프로젝트 코드·설정·tmp·docs</strong></td>
+<td>여기가 기준</td>
+</tr>
+<tr>
+<td><code>~/models/</code></td>
+<td>GGUF 대용량 (공용 자산)</td>
+<td>프로젝트 밖 유지 (용량·공유)</td>
+</tr>
+<tr>
+<td><code>~/.cursor</code>, <code>~/.codex</code></td>
+<td>IDE/에이전트 설정</td>
+<td>건드리지 않음</td>
+</tr>
+<tr>
+<td><code>~/ai-runtime/</code></td>
+<td>런타임/인프라 모음</td>
+<td>cursor-local-llm 외 다른 서비스 가능</td>
+</tr>
+</tbody></table>
+<p><strong>Cursor Workspace</strong>는 가능하면 <code>cursor-local-llm</code>으로 열 것.<br><code>/home/yunahe</code> 루트를 workspace로 쓰면 memory_store·캡처가 홈 전체와 섞입니다.</p>
+<hr>
+<h2 id="프로젝트-내부-구조-목표">프로젝트 내부 구조 (목표)</h2>
+<pre><code class="language-text">cursor-local-llm/
+├── configs/
+│   ├── model-profiles.env    # 프로필 (qwen3_coder | qwen3_6)
+│   └── models.manifest.json  # 모델 경로 참조
+├── docs/
+│   ├── ARCHITECTURE.md
+│   └── WORKSPACE_LAYOUT.md
+├── router/                   # Python router
+├── scripts/                  # 벤치, 다운로드, switch-model
+├── tmp/                      # 캡처, 벤치 결과, context-cache (gitignore)
+│   ├── cursor-captures/
+│   ├── context-cache/
+│   └── benchmark-*.json
+├── docker-compose.yml
+├── .env
+└── handoff.md
+</code></pre>
+<hr>
+<h2 id="홈-루트-정리-가이드">홈 루트 (`~/`) 정리 가이드</h2>
+<p>현재 루트에 <strong>이 프로젝트 전용으로 보이는 loose 파일은 거의 없음</strong>.<br>다만 아래는 정리 후보입니다 (수동 확인 후 삭제/이동):</p>
+<table>
+<thead>
+<tr>
+<th>경로</th>
+<th>판단</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>~/META-INF/</code></td>
+<td>Java 아티팩트 잔여 — 프로젝트 무관, 삭제 가능</td>
+</tr>
+<tr>
+<td><code>~/file1</code></td>
+<td>테스트 파일 — 삭제 가능</td>
+</tr>
+<tr>
+<td><code>~/react-preview/</code></td>
+<td>별도 실험 — 필요 시 <code>~/ai-runtime/</code> 아래로</td>
+</tr>
+<tr>
+<td><code>~/instantclient_*</code></td>
+<td>Oracle 클라이언트 — DB 작업용, 유지</td>
+</tr>
+<tr>
+<td><code>~/models/</code></td>
+<td><strong>유지</strong> — 모든 LLM GGUF 공용 저장소</td>
+</tr>
+</tbody></table>
+<p>프로젝트 산출물은 <strong>절대 홈 루트에 두지 말 것</strong>:</p>
+<ul>
+<li><code>results.json</code>, <code>current_state.json</code>, <code>*.flow.json</code> → <code>tmp/</code> 아래만</li>
+<li>벤치 결과 → <code>tmp/benchmark-*.json</code></li>
+</ul>
+<hr>
+<h2 id="모델-경로-공용-vs-프로젝트">모델 경로 (공용 vs 프로젝트)</h2>
+<p>모델 파일은 <strong>이동하지 않고</strong> <code>~/models/</code>에 둡니다 (17–22GB × N).</p>
+<p>프로젝트에서는 <strong>참조만</strong> 관리:</p>
+<ul>
+<li><code>configs/model-profiles.env</code></li>
+<li><code>configs/models.manifest.json</code></li>
+</ul>
+<pre><code class="language-bash"># 프로젝트에서 모델 위치 확인
+cat configs/models.manifest.json
+</code></pre>
+<hr>
+<h2 id="cursor-workspace-권장">Cursor workspace 권장</h2>
+<pre><code class="language-text">Workspace Path: /home/yunahe/ai-runtime/cursor-local-llm
+</code></pre>
+<p>이렇게 하면:</p>
+<ul>
+<li><code>memory_store</code> project key가 프로젝트 단위로 고정</li>
+<li>캡처/flow가 해당 repo 맥락만 포함</li>
+<li>루트 홈 디렉토리 오염 방지</li>
+</ul>
+
+      <p class="doc-meta">GitHub Markdown CSS + Mermaid.js (browser) · <code>WORKSPACE_LAYOUT.md</code></p>
+    </article>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    const SOURCES = [];
+    document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+      SOURCES[i] = el.textContent.trim();
+    });
+
+    function theme() {
+      return document.documentElement.dataset.theme === "dark" ? "dark" : "default";
+    }
+
+    function applyTheme(t) {
+      document.documentElement.dataset.theme = t;
+      document.getElementById("gh-md-light").disabled = t === "dark";
+      document.getElementById("gh-md-dark").disabled = t !== "dark";
+    }
+
+    const saved = localStorage.getItem("md-preview-theme");
+    applyTheme(saved === "light" || saved === "dark"
+      ? saved
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+
+    document.getElementById("theme-toggle").onclick = async () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      applyTheme(next);
+      localStorage.setItem("md-preview-theme", next);
+      await renderAll();
+    };
+
+    async function renderAll() {
+      document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+        el.innerHTML = SOURCES[i];
+        el.removeAttribute("data-processed");
+      });
+
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: theme(),
+        securityLevel: "loose",
+        fontFamily: '"Noto Sans KR", "trebuchet ms", verdana, arial, sans-serif',
+        flowchart: {
+          htmlLabels: true,
+          curve: "basis",
+          padding: 10,
+          nodeSpacing: 35,
+          rankSpacing: 40,
+          useMaxWidth: true,
+          wrappingWidth: 180,
+        },
+        state: {
+          nodeSpacing: 30,
+          rankSpacing: 35,
+          useMaxWidth: true,
+        },
+        sequence: {
+          useMaxWidth: true,
+          wrap: true,
+          width: 120,
+          height: 50,
+          boxMargin: 8,
+        },
+        themeVariables: {
+          fontSize: "14px",
+        },
+      });
+
+      await mermaid.run({ querySelector: ".mermaid" });
+    }
+
+    renderAll().catch((e) => {
+      console.error(e);
+      document.body.insertAdjacentHTML("beforeend",
+        '<p style="color:red;padding:1rem">Mermaid 로드 실패 — 인터넷 연결 확인 또는 <code>./scripts/serve-vision-html.sh</code></p>');
+    });
+  </script>
+</body>
+</html>

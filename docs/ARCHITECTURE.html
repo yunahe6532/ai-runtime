@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ARCHITECTURE</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-light.min.css" id="gh-md-light" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-dark.min.css" id="gh-md-dark" disabled />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fff;
+      color-scheme: light;
+    }
+    html[data-theme="dark"] body { background: #0d1117; color-scheme: dark; }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.55rem 1.25rem;
+      border-bottom: 1px solid #d0d7de;
+      background: #f6f8fa;
+      font-size: 0.875rem;
+    }
+    html[data-theme="dark"] .toolbar {
+      border-color: #30363d; background: #161b22; color: #e6edf3;
+    }
+    .toolbar button {
+      font: inherit; cursor: pointer;
+      border: 1px solid #d0d7de; background: #fff;
+      border-radius: 6px; padding: 0.2rem 0.55rem;
+    }
+    html[data-theme="dark"] .toolbar button {
+      border-color: #30363d; background: #21262d; color: #e6edf3;
+    }
+    .toolbar a { color: inherit; opacity: 0.65; text-decoration: none; }
+
+    .page { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    .markdown-body { min-width: 0; }
+
+    /* Cursor MD preview 스타일 Mermaid 카드 */
+    .markdown-body .mermaid-wrap {
+      margin: 0.85rem 0 1.25rem;
+      padding: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    html[data-theme="dark"] .markdown-body .mermaid-wrap {
+      border-color: #30363d; background: #161b22;
+    }
+    .markdown-body pre.mermaid {
+      margin: 0; padding: 0; background: transparent; border: 0;
+      font-family: inherit; text-align: center;
+    }
+    /* Mermaid가 그린 SVG — IDE처럼 컨테이너에 맞춤 (축소 눌림 없음) */
+    .markdown-body .mermaid-wrap svg {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .doc-meta {
+      margin-top: 2rem; padding-top: 1rem;
+      border-top: 1px solid #d0d7de;
+      font-size: 0.8rem; opacity: 0.6;
+    }
+    html[data-theme="dark"] .doc-meta { border-color: #30363d; }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <strong>ARCHITECTURE</strong>
+    <span>2026-06-21 · Mermaid 7개</span>
+    <div>
+      <button type="button" id="theme-toggle">🌓</button>
+      <a href="#top">↑</a>
+    </div>
+  </header>
+  <div class="page" id="top">
+    <article class="markdown-body">
+<h1 id="ai-runtime-architecture-technical-reference">AI Runtime — Architecture (Technical Reference)</h1>
+<blockquote>
+<p><strong>제품 정의 · Business · Roadmap</strong> → <a href="./VISION.md">VISION.md</a><br><strong>벤치마크 · 그래프 · 재현</strong> → <a href="./BENCHMARK.md">BENCHMARK.md</a><br><strong>역할</strong>: Cursor ↔ llama.cpp <strong>Middleware</strong> — Context Runtime v1 core + Agent reference (v2)</p>
+</blockquote>
+<hr>
+<h2 id="목차">목차</h2>
+<ol>
+<li><a href="#1-overview">Overview</a></li>
+<li><a href="#2-runtime-flow--master-pipeline">Runtime Flow — Master Pipeline</a></li>
+<li><a href="#3-need-analysis--dynamic-budget">Need Analysis → Dynamic Budget</a></li>
+<li><a href="#4-recovery-loop">Recovery Loop</a></li>
+<li><a href="#5-memory-layer">Memory Layer</a></li>
+<li><a href="#6-runtime-closed-loop">Runtime Closed Loop</a></li>
+<li><a href="#7-module-map">Module Map</a></li>
+<li><a href="#8-sequence--one-request">Sequence — One Request</a></li>
+<li><a href="#9-agent-reference-layer-v2">Agent Reference Layer (v2)</a></li>
+<li><a href="#10-api--inspector--env">API · Inspector · Env</a></li>
+<li><a href="#11-deployment--verification">Deployment · Verification</a></li>
+</ol>
+<hr>
+<h2 id="1-overview">1. Overview</h2>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-1">flowchart TB
+    subgraph apps["Applications"]
+        IDE[Cursor · Continue · CLI]
+    end
+    subgraph policy["Runtime Policy Layer — Build"]
+        NA[ContextNeed]
+        SCH[Scheduler I/O]
+        DB[Dynamic Budget]
+        CV[Coverage]
+        RC[Recovery]
+        PB[Prompt Pack Policy]
+    end
+    subgraph buy["Adapters — Buy"]
+        MEM[memory → LangGraph]
+        RET[retrieval → LlamaIndex]
+        TR[trace → OTel]
+        GW[gateway → LiteLLM]
+    end
+    subgraph eng["Inference — Buy"]
+        LLM[llama.cpp · vLLM · API]
+    end
+    IDE --&gt; policy
+    policy --&gt; buy
+    buy --&gt; eng</pre></div>
+<table>
+<thead>
+<tr>
+<th>계층</th>
+<th>책임</th>
+<th>Build/Buy</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Application</td>
+<td>UI, tool 실행</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Policy Layer</strong></td>
+<td>need, budget, coverage, recovery</td>
+<td><strong>Build</strong></td>
+</tr>
+<tr>
+<td><strong>Adapters</strong></td>
+<td>checkpoint, vector, gateway, trace</td>
+<td><strong>Buy glue</strong></td>
+</tr>
+<tr>
+<td>Inference</td>
+<td>forward, sampling</td>
+<td><strong>Buy</strong></td>
+</tr>
+</tbody></table>
+<p>Delta policy + dynamic budget → Cursor 100K+ history → LLM <strong>~0.6–10K proxy</strong> (실측 −90%).</p>
+<h3 id="11-scheduler-contract">1.1 Scheduler Contract</h3>
+<pre><code class="language-text">Inputs (SchedulerInputs)              Outputs (SchedulerOutputs)
+────────────────────────              ──────────────────────────
+Intent                                History (session_tail + delta)
+Phase                                 Retrieved
+Retrieved Tokens (measured)           Artifact
+Coverage Score / Complete             Memory (state)
+GPU Backend                           Output Tokens
+Context Window                        System · Plan · Current Task
+Max Output Tokens
+Recovery Round
+</code></pre>
+<p><code>runtime_core/scheduler_contract.py</code> · wired in <code>dynamic_context_scheduler.py</code></p>
+<h3 id="12-why-each-step">1.2 Why each step</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Need</td>
+<td>LLM이 이번 턴에 필요한 source·symbol 결정</td>
+</tr>
+<tr>
+<td>Retrieve</td>
+<td>vector engine(Buy) 결과를 need에 맞게 수집</td>
+</tr>
+<tr>
+<td>Measure</td>
+<td>추정이 아닌 실측 token</td>
+</tr>
+<tr>
+<td>Allocate</td>
+<td>32K window slot 재배치</td>
+</tr>
+<tr>
+<td>Coverage</td>
+<td>truncate·must_include 검사</td>
+</tr>
+<tr>
+<td>Recovery</td>
+<td>부족 시 budget↑ · re-retrieve</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="2-runtime-flow-master-pipeline">2. Runtime Flow — Master Pipeline</h2>
+<h3 id="21-end-to-end-context-runtime-v1">2.1 End-to-end (Context Runtime v1)</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-2">flowchart TD
+    IN[Cursor IN full history] --&gt; IDX[message_index]
+    IDX --&gt; MS[memory_store delta artifact]
+    MS --&gt; NEED[ContextNeed extract]
+    NEED --&gt; RET[retrieve_for_need]
+    RET --&gt; MEAS[Measure retrieval tokens]
+    MEAS --&gt; BUD[allocate_dynamic]
+    BUD --&gt; BUILD[build_with_budget]
+    BUILD --&gt; COV[check_coverage]
+    COV --&gt;|complete| LLM[llama-long]
+    COV --&gt;|fail| REC[recovery_scheduler]
+    REC --&gt; RET
+    REC --&gt; BUD
+    REC --&gt; BUILD
+    LLM --&gt; LOG[runtime_turn_log + OTel]
+    LOG --&gt; OUT[Cursor OUT]</pre></div>
+<h3 id="22-19단계-운영-파이프라인">2.2 19단계 (운영 파이프라인)</h3>
+<pre><code class="language-text">[1]  Cursor IN              full history (Router만 수신)
+[2]  message_index          stable key diff (append-only | rebuild)
+[3]  adapters.memory        delta policy · legacy/LangGraph backend
+[4]  failed_action          실패 tool → cold summary
+[5]  planner (reference)    AgentPlan — v2 SKU
+[6]  adapters.observe       run events · Langfuse + legacy SSE
+[7]  ContextNeed            intent preset + merge
+[8]  adapters.retrieval     LlamaIndex/BM25 + budget policy
+[9]  allocate_dynamic       BudgetPlan (NOT static first)
+[10] prompt_builder         PromptPack + truncation markers
+[11] coverage_checker       must_include · symbol · truncation
+[12] recovery_scheduler     fail → bump → re-retrieve → rebuild
+[13] loop_guard             final gate (coverage insufficient)
+[14] qwen_request           phase kwargs → llama-long
+[15] agent_exec (reference) guard · normalize · leak
+[16] evidence layer (v2)    tool → EvidenceItem
+[17] evidence_judge (v2)    batch sufficiency
+[18] runtime_inspector      chat &lt;details&gt; Budget/Coverage
+[19] Cursor                 local tool exec → loop
+</code></pre>
+<h3 id="23-static-vs-dynamic-budget">2.3 Static vs Dynamic Budget</h3>
+<p><strong>POC 한계 (static)</strong>: phase별 고정 비율 — recall/bugfix에 동일 비율 적용.</p>
+<p><strong>Runtime (dynamic)</strong>: 순서가 다르다.</p>
+<pre><code class="language-text">❌ Budget 고정 → Retrieve → truncate blindly
+✅ Need → Retrieve → Measure → Allocate → Coverage → Recovery
+</code></pre>
+<hr>
+<h2 id="3-need-analysis-dynamic-budget">3. Need Analysis → Dynamic Budget</h2>
+<h3 id="31-need-analysis-flow">3.1 Need Analysis Flow</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-3">flowchart LR
+    Q[User Question] --&gt; P[AgentPlan / intent]
+    P --&gt; CN[ContextNeed]
+    CN --&gt; RS[required_sources]
+    CN --&gt; MT[must_include]
+    CN --&gt; CT[coverage_targets]
+    CT --&gt; RET[Retriever priority]
+    RS --&gt; RET
+    RET --&gt; MEAS[Token measure]
+    MEAS --&gt; ALLOC[allocate_dynamic]
+    ALLOC --&gt; BUILD[PromptPack]
+    BUILD --&gt; COV[Coverage]
+    COV --&gt; LLM[LLM]</pre></div>
+<h3 id="32-contextneed-스키마">3.2 ContextNeed 스키마</h3>
+<table>
+<thead>
+<tr>
+<th>필드</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>intent</code></td>
+<td>bugfix · recall · doc_summary · architecture · code_edit</td>
+</tr>
+<tr>
+<td><code>required_sources</code></td>
+<td>retrieved_code · tool_result · session</td>
+</tr>
+<tr>
+<td><code>must_include</code></td>
+<td>current user request · latest tool result · agent plan</td>
+</tr>
+<tr>
+<td><code>coverage_targets</code></td>
+<td><code>file.py</code> · <code>file.py::symbol</code></td>
+</tr>
+<tr>
+<td><code>priority</code></td>
+<td>슬롯 가중치 (retrieved vs session_tail vs artifact)</td>
+</tr>
+</tbody></table>
+<p>Intent preset 5종 — <code>router/context_need.py</code></p>
+<h3 id="33-measure-allocate">3.3 Measure → Allocate</h3>
+<pre><code class="language-text">Retriever returns: planner 1200 + memory 800 + benchmark 600 = 2600 tokens measured
+
+allocate_dynamic():
+  retrieved  ← f(measured, intent, phase)
+  session_tail ← recall intent ↑
+  artifact   ← architecture ↑
+  output_reserved ← phase max_tokens
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Intent</th>
+<th align="center">session_tail</th>
+<th align="center">retrieved</th>
+<th align="center">artifact</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>recall</td>
+<td align="center"><strong>↑</strong></td>
+<td align="center">↓</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td>bugfix</td>
+<td align="center">↓</td>
+<td align="center"><strong>↑</strong></td>
+<td align="center">↑</td>
+</tr>
+<tr>
+<td>doc_summary</td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center"><strong>↑</strong></td>
+</tr>
+</tbody></table>
+<p>구현: <code>router/context_budget.py</code> · <code>router/dynamic_context_scheduler.py</code></p>
+<h3 id="34-coverage-check">3.4 Coverage Check</h3>
+<p>truncate는 필연적이다. Runtime은 <strong>잘렸는지 안다.</strong></p>
+<table>
+<thead>
+<tr>
+<th>검사</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>must_include</td>
+<td>current task · tool result · agent plan</td>
+</tr>
+<tr>
+<td>symbol</td>
+<td><code>context_budget.py::allocate_dynamic</code></td>
+</tr>
+<tr>
+<td>truncation</td>
+<td>critical source lost_tokens</td>
+</tr>
+<tr>
+<td>evidence</td>
+<td>evidence_needed vs collected</td>
+</tr>
+</tbody></table>
+<p><code>action</code>: <code>proceed</code> | <code>re_retrieve</code> | <code>increase_budget</code> | <code>ask_tool</code></p>
+<hr>
+<h2 id="4-recovery-loop">4. Recovery Loop</h2>
+<h3 id="41-flow">4.1 Flow</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-4">flowchart TD
+    COV[Coverage Report] --&gt; OK{complete?}
+    OK --&gt;|Yes| LLM[Proceed to LLM / Final]
+    OK --&gt;|No| ACT{action}
+    ACT --&gt;|increase_budget| BUMP[Budget × 1.25]
+    ACT --&gt;|re_retrieve| BUMP
+    BUMP --&gt; RET[retrieve_for_need force_refresh]
+    RET --&gt; BUILD[build_with_budget]
+    BUILD --&gt; COV2[Re-check coverage]
+    COV2 --&gt; RND{rounds &lt; max?}
+    RND --&gt;|fail| COV
+    RND --&gt;|pass| LLM
+    COV2 --&gt;|ask_tool| TOOL[Stay tool_planning]</pre></div>
+<h3 id="42-recovery-scheduler">4.2 Recovery Scheduler</h3>
+<pre><code class="language-text">Coverage Fail
+    ↓
+Budget + (RECOVERY_BUDGET_BUMP=1.25)
+    ↓
+Re-Retrieve (section / artifact / vector)
+    ↓
+Prompt Rebuild
+    ↓
+Coverage Re-check
+    ↓
+Pass → final allowed · Fail → loop_guard blocks
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>env</th>
+<th>default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>RECOVERY_ENABLED</code></td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td><code>MAX_RECOVERY_ROUNDS</code></td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td><code>COVERAGE_THRESHOLD</code></td>
+<td><code>0.75</code></td>
+</tr>
+</tbody></table>
+<p>E2E: <code>scripts/benchmark-recovery-e2e.py</code> — before 0.36 → after 1.00 ✅</p>
+<hr>
+<h2 id="5-memory-layer">5. Memory Layer</h2>
+<h3 id="51-history-prompt-pack">5.1 History → Prompt Pack</h3>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-5">flowchart LR
+    FH["Full History 100K+"] --&gt; IDX[message_index]
+    IDX --&gt; DELTA[RequestDelta]
+    DELTA --&gt; STATE[SessionState]
+    STATE --&gt; ART[Artifact Store]
+    STATE --&gt; FAIL[failed_action cold]
+    ART --&gt; PACK["PromptPack 0.6–10K"]
+    FAIL --&gt; PACK
+    PACK --&gt; LLM[LLM]</pre></div>
+<h3 id="52-hot-cold">5.2 Hot / Cold</h3>
+<table>
+<thead>
+<tr>
+<th>계층</th>
+<th>Hot (매 turn)</th>
+<th>Cold</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>메시지</td>
+<td>delta + artifact tail</td>
+<td>message_keys snapshot</td>
+</tr>
+<tr>
+<td>index</td>
+<td>incremental build</td>
+<td>full rebuild</td>
+</tr>
+<tr>
+<td>실패 tool</td>
+<td><code>[failed_tool_actions]</code></td>
+<td>summaries map</td>
+</tr>
+<tr>
+<td>phase</td>
+<td>PhaseState events</td>
+<td>scan fallback</td>
+</tr>
+</tbody></table>
+<h3 id="53-retriever-vector-optional">5.3 Retriever + Vector (optional)</h3>
+<pre><code class="language-text">retrieve_for_need()
+  ├─ artifact score (query · delta · path)
+  ├─ vector_retrieve (BM25 or LlamaIndex)  VECTOR_RETRIEVAL=1
+  └─ rank_by_need + budget ceiling
+</code></pre>
+<p>E2E corpus: 115 artifacts — <code>bash scripts/run-vector-e2e.sh</code></p>
+<hr>
+<h2 id="6-runtime-closed-loop">6. Runtime Closed Loop</h2>
+<p>Context Runtime v1의 <strong>정체성</strong> — Coverage 기반 폐쇄 루프.</p>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-6">flowchart TD
+    T[Task / Question] --&gt; N[Need Analysis]
+    N --&gt; M[Memory + Delta]
+    M --&gt; R[Retrieve]
+    R --&gt; B[Budget]
+    B --&gt; C[Coverage]
+    C --&gt;|fail| REC[Recovery]
+    REC --&gt; R
+    C --&gt;|pass| P[Prompt]
+    P --&gt; L[LLM]
+    L --&gt; J[Judge · v2 reference]
+    J --&gt; E{Enough?}
+    E --&gt;|No| N
+    E --&gt;|Yes| F[Final Answer]</pre></div>
+<h3 id="judge-3층-v2-reference-referenceevidencejudgepy">Judge 3층 (v2 reference — `reference/evidence_judge.py`)</h3>
+<pre><code class="language-text">Static pre-eval  → coverage, repeat, budget, leak
+LLM Judge        → “답 가능한가?” + next_actions
+Runtime guard    → should_block_final_answer
+</code></pre>
+<hr>
+<h2 id="7-module-map">7. Module Map</h2>
+<h3 id="71-4-tier-build-buy-legacy-reference">7.1 4-tier (Build / Buy / Legacy / Reference)</h3>
+<pre><code class="language-text">runtime_core/     Build — need · budget · coverage · recovery · scheduler_contract
+adapters/         Buy glue — memory · retrieval · gateway · trace · observe
+legacy/           POC isolation — memory_store · retriever · agent_runs · optimizers
+reference/        v2 Agent POC — planner · judge · loop_guard
+integrations/     llamaindex · otel · langfuse low-level
+</code></pre>
+<h3 id="72-runtime-core-build-context-runtime-v1-sku">7.2 Runtime Core (Build — Context Runtime v1 SKU)</h3>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Path</th>
+<th align="center">IP</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ContextNeed</td>
+<td><code>context_need.py</code></td>
+<td align="center">★★★★★</td>
+</tr>
+<tr>
+<td>BudgetPlan</td>
+<td><code>context_budget.py</code></td>
+<td align="center">★★★★★</td>
+</tr>
+<tr>
+<td>Coverage</td>
+<td><code>coverage_checker.py</code></td>
+<td align="center">★★★★★</td>
+</tr>
+<tr>
+<td>Recovery</td>
+<td><code>recovery_scheduler.py</code></td>
+<td align="center">★★★★★</td>
+</tr>
+<tr>
+<td>Scheduler contract</td>
+<td><code>runtime_core/scheduler_contract.py</code></td>
+<td align="center">★★★★★</td>
+</tr>
+<tr>
+<td>Orchestrator</td>
+<td><code>dynamic_context_scheduler.py</code></td>
+<td align="center">★★★★★</td>
+</tr>
+<tr>
+<td>PromptPack policy</td>
+<td><code>prompt_builder.py</code></td>
+<td align="center">★★★★☆</td>
+</tr>
+<tr>
+<td>Message index</td>
+<td><code>message_index.py</code></td>
+<td align="center">★★★☆☆</td>
+</tr>
+<tr>
+<td>Turn log</td>
+<td><code>runtime_turn_log.py</code></td>
+<td align="center">★★☆☆☆</td>
+</tr>
+</tbody></table>
+<h3 id="73-adapters-buy-glue">7.3 Adapters (Buy glue)</h3>
+<table>
+<thead>
+<tr>
+<th>Adapter</th>
+<th>Buy target</th>
+<th>Legacy fallback</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>adapters/memory.py</code></td>
+<td>LangGraph checkpointer</td>
+<td><code>legacy/memory_store.py</code></td>
+</tr>
+<tr>
+<td><code>adapters/retrieval.py</code></td>
+<td>LlamaIndex</td>
+<td><code>legacy/retriever.py</code> BM25</td>
+</tr>
+<tr>
+<td><code>adapters/gateway.py</code></td>
+<td>LiteLLM</td>
+<td>direct httpx</td>
+</tr>
+<tr>
+<td><code>adapters/trace.py</code></td>
+<td>OpenTelemetry</td>
+<td>optional JSON</td>
+</tr>
+<tr>
+<td><code>adapters/observe.py</code></td>
+<td>Langfuse</td>
+<td><code>legacy/agent_runs.py</code> SSE</td>
+</tr>
+</tbody></table>
+<h3 id="74-reference-agent-runtime-v2-cursor-poc">7.4 Reference (Agent Runtime v2 — Cursor POC)</h3>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Planner</td>
+<td><code>reference/planner.py</code></td>
+</tr>
+<tr>
+<td>Plan guard</td>
+<td><code>reference/plan_state.py</code></td>
+</tr>
+<tr>
+<td>Executor</td>
+<td><code>reference/agent_exec.py</code></td>
+</tr>
+<tr>
+<td>Judge</td>
+<td><code>reference/evidence_judge.py</code></td>
+</tr>
+<tr>
+<td>Loop guard</td>
+<td><code>reference/loop_guard.py</code></td>
+</tr>
+</tbody></table>
+<p>상세 tier → <a href="./MODULE_MAP.md">MODULE_MAP.md</a></p>
+<hr>
+<h2 id="8-sequence-one-request">8. Sequence — One Request</h2>
+<div class="mermaid-wrap"><pre class="mermaid" id="mmd-7">sequenceDiagram
+    participant C as Cursor
+    participant R as Router
+    participant M as Memory
+    participant S as Scheduler
+    participant L as llama-long
+
+    C-&gt;&gt;R: POST /v1/chat/completions (100K history)
+    R-&gt;&gt;M: extract_delta, ingest artifacts
+    M-&gt;&gt;S: ContextNeed + retrieve + budget
+    S-&gt;&gt;S: coverage check
+    alt coverage fail
+        S-&gt;&gt;S: recovery (bump, re-retrieve)
+    end
+    S-&gt;&gt;R: PromptPack ~10K
+    R-&gt;&gt;L: compact proxy
+    L-&gt;&gt;R: tool_call / prose
+    R-&gt;&gt;C: OpenAI response + Inspector</pre></div>
+<p>OTel: <code>integrations/flow_tracing.py</code> — cursor_in → router_proxy → llm_response</p>
+<hr>
+<h2 id="9-agent-reference-layer-v2">9. Agent Reference Layer (v2)</h2>
+<p>Cursor agent 안정화용 — v1 SKU 필수 아님.</p>
+<pre><code class="language-text">ensure_agent_plan() → AgentPlan
+    ↓
+prompt_builder [Saved Agent Plan]
+    ↓
+LLM tool_call
+    ↓
+validate_tool_call() / read_guard
+    ↓
+evidence_extractors → evidence_collected
+    ↓
+evidence_judge → final_ready | tool_planning
+    ↓
+loop_guard → should_block_final_answer
+</code></pre>
+<p>환경: <code>PLANNER_MODE=rule|llm|hybrid</code> · <code>EVIDENCE_JUDGE_ENABLED=1</code></p>
+<hr>
+<h2 id="10-api-inspector-env">10. API · Inspector · Env</h2>
+<h3 id="101-agent-run-trace">10.1 Agent Run Trace</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/router/agent/runs</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/router/agent/runs/{id}/events</code> (SSE)</td>
+</tr>
+</tbody></table>
+<h3 id="102-runtime-inspector">10.2 Runtime Inspector</h3>
+<p>Budget · Coverage · Recovery · ContextNeed — <code>runtime_inspector.py</code><br>SSE chunk: <code>Runtime · phase · cov 0.82 · blocked:reason</code></p>
+<h3 id="103-핵심-환경-변수">10.3 핵심 환경 변수</h3>
+<table>
+<thead>
+<tr>
+<th>변수</th>
+<th>default</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DYNAMIC_BUDGET</code></td>
+<td><code>1</code></td>
+<td>dynamic scheduler</td>
+</tr>
+<tr>
+<td><code>COVERAGE_CHECK</code></td>
+<td><code>1</code></td>
+<td>coverage + recovery</td>
+</tr>
+<tr>
+<td><code>RECOVERY_ENABLED</code></td>
+<td><code>1</code></td>
+<td>recovery loop</td>
+</tr>
+<tr>
+<td><code>VECTOR_RETRIEVAL</code></td>
+<td><code>0</code></td>
+<td>vector merge in retriever</td>
+</tr>
+<tr>
+<td><code>OTEL_FLOW_TRACE</code></td>
+<td><code>1</code></td>
+<td>OTel 3-stage spans</td>
+</tr>
+<tr>
+<td><code>MEMORY_STORE</code></td>
+<td><code>1</code></td>
+<td>delta + artifact</td>
+</tr>
+<tr>
+<td><code>CURSOR_RUNTIME_INSPECTOR</code></td>
+<td><code>1</code></td>
+<td>chat details UI</td>
+</tr>
+</tbody></table>
+<p>전체 env → 하단 Legacy 섹션 · <a href="./INTEGRATIONS.md">INTEGRATIONS.md</a></p>
+<hr>
+<h2 id="11-deployment-verification">11. Deployment · Verification</h2>
+<h3 id="111-unified-topology">11.1 Unified Topology</h3>
+<pre><code class="language-text">Cursor → Router (Context Runtime + reference agent)
+              → llama-long ONLY (Qwen3.6-27B + mmproj)
+                    ├─ /v1/chat/completions
+                    └─ /router/agent/runs/{id}/events
+</code></pre>
+<h3 id="112-context-policy">11.2 Context Policy</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>값</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>운영 ctx</td>
+<td><strong>32K</strong></td>
+</tr>
+<tr>
+<td>실험</td>
+<td>200K only</td>
+</tr>
+</tbody></table>
+<h3 id="113-검증-명령">11.3 검증 명령</h3>
+<pre><code class="language-bash">python3 scripts/benchmark-dynamic-budget-matrix.py   # 25 cases
+python3 scripts/benchmark-recovery-e2e.py
+bash scripts/run-vector-e2e.sh
+python3 scripts/benchmark-runtime-score.py --tasks 30
+python3 scripts/test-runtime-inspector.py
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>지표</th>
+<th align="center">목표</th>
+<th align="center">p1</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Runtime success</td>
+<td align="center">≥95%</td>
+<td align="center"><strong>100%</strong></td>
+</tr>
+<tr>
+<td>Context proxy</td>
+<td align="center">−80%</td>
+<td align="center"><strong>−90%</strong></td>
+</tr>
+<tr>
+<td>Recovery E2E</td>
+<td align="center">pass</td>
+<td align="center">✅</td>
+</tr>
+</tbody></table>
+<p>벤치 전체 → <a href="./BENCHMARK.md">BENCHMARK.md</a></p>
+<h3 id="114-fallback-profile">11.4 Fallback Profile</h3>
+<p><code>qwen3_6_27b</code> → <code>qwen3_coder</code> (장애 시)</p>
+<hr>
+<h2 id="legacy-operational-notes">Legacy Operational Notes</h2>
+<p><em>(아래는 운영·Inspector·Judge 상세 — 경로는 <code>reference/</code> 로 이전됨)</em></p>
+<h3 id="loop-guard-referenceloopguardpy">Loop Guard (`reference/loop_guard.py`)</h3>
+<table>
+<thead>
+<tr>
+<th>규칙</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>coverage incomplete</td>
+<td>final 차단</td>
+</tr>
+<tr>
+<td>critical truncation</td>
+<td>recovery 미성공 시 차단</td>
+</tr>
+<tr>
+<td>final_answer_count</td>
+<td>turn당 1회</td>
+</tr>
+<tr>
+<td>bad ping_pong</td>
+<td>plan.repair</td>
+</tr>
+</tbody></table>
+<h3 id="evidence-judge-referenceevidencejudgepy">Evidence Judge (`reference/evidence_judge.py`)</h3>
+<p>Batch size 2 · hybrid static+LLM · <code>next_actions</code> ≤3</p>
+<h3 id="inspector-섹션">Inspector 섹션</h3>
+<p>Runtime Snapshot · Budget · Coverage · ContextNeed · Evidence Judge</p>
+<pre><code class="language-bash">python3 scripts/test-evidence-judge.py
+python3 scripts/test-ping-pong-gate.py
+</code></pre>
+<hr>
+<h2 id="관련-문서">관련 문서</h2>
+<table>
+<thead>
+<tr>
+<th>문서</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="./VISION.md">VISION.md</a></td>
+<td>Product · Business · Flow 요약</td>
+</tr>
+<tr>
+<td><a href="./BENCHMARK.md">BENCHMARK.md</a></td>
+<td>수치 · 변천사</td>
+</tr>
+<tr>
+<td><a href="./MODULE_MAP.md">MODULE_MAP.md</a></td>
+<td>코드 tier</td>
+</tr>
+<tr>
+<td><a href="./INTEGRATIONS.md">INTEGRATIONS.md</a></td>
+<td>Build vs Buy</td>
+</tr>
+</tbody></table>
+<p><em>Last updated: 2026-06-18 — Technical reference: Flow, Need, Budget, Recovery, Closed Loop</em></p>
+
+      <p class="doc-meta">GitHub Markdown CSS + Mermaid.js (browser) · <code>ARCHITECTURE.md</code></p>
+    </article>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    const SOURCES = [];
+    document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+      SOURCES[i] = el.textContent.trim();
+    });
+
+    function theme() {
+      return document.documentElement.dataset.theme === "dark" ? "dark" : "default";
+    }
+
+    function applyTheme(t) {
+      document.documentElement.dataset.theme = t;
+      document.getElementById("gh-md-light").disabled = t === "dark";
+      document.getElementById("gh-md-dark").disabled = t !== "dark";
+    }
+
+    const saved = localStorage.getItem("md-preview-theme");
+    applyTheme(saved === "light" || saved === "dark"
+      ? saved
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+
+    document.getElementById("theme-toggle").onclick = async () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      applyTheme(next);
+      localStorage.setItem("md-preview-theme", next);
+      await renderAll();
+    };
+
+    async function renderAll() {
+      document.querySelectorAll("pre.mermaid").forEach((el, i) => {
+        el.innerHTML = SOURCES[i];
+        el.removeAttribute("data-processed");
+      });
+
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: theme(),
+        securityLevel: "loose",
+        fontFamily: '"Noto Sans KR", "trebuchet ms", verdana, arial, sans-serif',
+        flowchart: {
+          htmlLabels: true,
+          curve: "basis",
+          padding: 10,
+          nodeSpacing: 35,
+          rankSpacing: 40,
+          useMaxWidth: true,
+          wrappingWidth: 180,
+        },
+        state: {
+          nodeSpacing: 30,
+          rankSpacing: 35,
+          useMaxWidth: true,
+        },
+        sequence: {
+          useMaxWidth: true,
+          wrap: true,
+          width: 120,
+          height: 50,
+          boxMargin: 8,
+        },
+        themeVariables: {
+          fontSize: "14px",
+        },
+      });
+
+      await mermaid.run({ querySelector: ".mermaid" });
+    }
+
+    renderAll().catch((e) => {
+      console.error(e);
+      document.body.insertAdjacentHTML("beforeend",
+        '<p style="color:red;padding:1rem">Mermaid 로드 실패 — 인터넷 연결 확인 또는 <code>./scripts/serve-vision-html.sh</code></p>');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "description": "Canonical model paths (files live under ~/models, shared across projects)",
+  "profiles_file": "configs/model-profiles.env",
+  "switch_script": "scripts/switch-model.sh",
+  "models": {
+    "qwen3_coder": {
+      "label": "Qwen3-Coder-30B-A3B",
+      "coder_gguf": "~/models/qwen-coder/Qwen3-Coder-30B-A3B-Instruct-UD-Q4_K_XL.gguf",
+      "vl_gguf": "~/models/qwen-vl/Qwen3VL-30B-A3B-Instruct-Q4_K_M.gguf",
+      "vl_mmproj": "~/models/qwen-vl/mmproj-Qwen3VL-30B-A3B-Instruct-F16.gguf",
+      "router_mode": "legacy",
+      "hf_repo": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF"
+    },
+    "qwen3_6": {
+      "label": "Qwen3.6-35B-A3B",
+      "coder_gguf": "~/models/qwen36/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+      "mmproj": "~/models/qwen36/mmproj-F16.gguf",
+      "router_mode": "unified",
+      "vl_pass": false,
+      "fallback": "qwen3_coder",
+      "hf_repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+      "quant": "UD-Q4_K_M",
+      "note": "NOT MTP-GGUF. Vision via mmproj on same server."
+    }
+  }
+}
