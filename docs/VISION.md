@@ -157,11 +157,14 @@ flowchart TB
 ### 2.2 코드 tier (`cursor-local-llm`)
 
 ```text
-runtime_kernel/     Memory scheduling — index · WS · journal · budget · coverage
-agent_brain/        RuntimeState · PlannerDecision · shadow (Phase 2)
-observability/      turn_log SSOT
+runtime_kernel/     Memory scheduling — index · WS · journal · budget · coverage · runtime_paths
+agent_brain/        RuntimeState · PlannerDecision · shadow · LLM planner · promotion gate (Phase 2)
+observability/      turn_log · explorer trace SSOT
 reference/          Cursor agent POC — hard guard + tool exec (v2 경계)
+legacy/             fallback modules (hot path 외; optimizer 등 archive stub)
 ```
+
+Runtime artifact SSOT: `AI_RUNTIME_DATA_DIR` (기본 `~/.local/share/ai-runtime`) — captures · traces · benchmarks · archive. Repo `tmp/`는 fallback만.
 
 ### 2.3 Thinking vs Middleware
 
@@ -184,25 +187,48 @@ Runtime: hard guard — ping-pong · leak · premature final (reference/)
 | Final Report Renderer | `runtime_kernel/final_report.py` · LLM polish optional |
 | Coverage / Recovery policy | `coverage_checker.py` · recovery loop |
 | Dynamic budget + prompt pack | `dynamic_context_scheduler.py` |
+| RuntimeState contract | `agent_brain/runtime_state.py` · `RuntimeStateBuilder` |
+| Planner shadow (rule vs heuristic) | `agent_brain/planner_shadow.py` · `PLANNER_SHADOW_MODE=1` |
+| LLM planner shadow (3-way compare) | `agent_brain/llm_planner.py` · `LLM_PLANNER_SHADOW_ENABLED=0` default |
+| Promotion gate + read-only apply | `agent_brain/promotion_gate.py` · kill switch default off |
+| Explorer trace SSOT | `explorer_trace.py` · NDJSON + flow replay |
+| Phase-aware proxy system | `compose_proxy_system` · intent/phase instruction priority |
+| Project Index hygiene | vendor/tmp/runtime_data 제외 · `classify_path` |
 
 #### In Progress
 
 | 기능 | 모듈 · 비고 |
 |------|------------|
-| RuntimeState contract | `agent_brain/runtime_state.py` · `RuntimeStateBuilder` |
-| Planner shadow mode | `agent_brain/planner_shadow.py` · `PLANNER_SHADOW_MODE=1` |
+| AI Planner partial authority | read/grep/glob only · `PLANNER_PROMOTION_ENABLE_READONLY=0` default (Phase 2.2b) |
+| Promotion metrics / tuning | `audit-planner-promotion-metrics.py` · intent allowlist (Phase 2.2c) |
 | Self Model wire | `runtime_kernel/self_model.py` · prompt excerpt only |
+| Task-centric planner loop | next_action 승격 일부만 · edit/shell/final은 hard guard 유지 |
 
 #### Planned
 
 | 기능 | 비고 |
 |------|------|
-| AI Planner decision authority | `PlannerDecision` → hot path 승격 (Phase 2.1) |
+| AI Planner full authority | edit/shell/final 승격 없음 — reference guard 유지 |
+| MCP v2 adapter | `adapters/mcp.py` stub |
 | Memory summarization loop | 오래된 turn → session summary artifact (Phase 3) |
 | GPU Context / KV prefix policy | Prompt residency · prefix reuse 연구 (Phase 3+) |
 | reference/ hot path 분리 | agent logic vs kernel 경계 정리 |
 
 상세 Phase → [REFACTOR.md](./REFACTOR.md)
+
+#### Phase 2 Planner — env kill switch (default = hot path 동일)
+
+| 변수 | default | 역할 |
+|------|---------|------|
+| `PLANNER_SHADOW_MODE` | `1` | rule vs heuristic shadow |
+| `LLM_PLANNER_SHADOW_ENABLED` | `0` | LLM 3-way compare |
+| `PLANNER_PROMOTION_GATE_ENABLED` | `1` | 승격 판정 |
+| `PLANNER_PROMOTION_SHADOW_ONLY` | `1` | `0`일 때만 apply |
+| `PLANNER_PROMOTION_ENABLE_READONLY` | `0` | read/grep/glob apply 허용 |
+| `PLANNER_PROMOTION_MAX_PER_TURN` | `1` | turn당 승격 1회 |
+
+승격 대상: `read` · `grep` · `glob` → `ReadSource` / `GrepSource` / `GlobSource`.  
+금지: `edit` · `shell` · `final` · `summarize` · `recover` · `ask_user`.
 
 ---
 
@@ -292,15 +318,16 @@ Journal · Evidence · Handoff로 세션·작업 단절 후 재개를 목표로 
 | 필드 | 상태 |
 |------|------|
 | YAML 정의 + prompt block | **Implemented** (`runtime_self_model.yaml`) |
-| Planner SSOT 입력 | **Planned** (Phase 2.1) |
+| Planner SSOT 입력 (`RuntimeState`) | **Implemented** (Phase 2.0) |
+| Planner hot path (read-only partial) | **In Progress** (Phase 2.2b — kill switch default off) |
 
 ### 3.11 Project Bootstrap — **Implemented**
 
 프로젝트 open 시 LLM 없이 pipeline scan → Project Index. 구조 반복 탐색은 middleware 책임.
 
-### 3.12 Task 중심 방향 — **Planned**
+### 3.12 Task 중심 방향 — **In Progress**
 
-v1은 Need → Retrieve → Prompt (과도기). v2+에서 Planner가 task·WS·next action 주도.
+v1은 Need → Retrieve → Prompt (과도기). Phase 2에서 RuntimeState · shadow · **read/grep/glob 부분 승격**이 pack 빌드 전에 연결됨. edit/shell/final은 reference guard로 차단.
 
 ### 3.13 목표 (비과장)
 
@@ -362,20 +389,23 @@ Inference     — prompt pack · llama.cpp adapter
 
 ```text
 IDE IN → Memory Ingest → Project Index ensure
+    → AgentPlan ensure → Planner shadow (+ optional LLM + promotion apply)
     → Need Analysis → Working Set Plan → Retrieve (1-pass)
     → Dynamic Budget → Prompt Pack → Coverage/Recovery
     → Local LLM → tool results → Memory · Journal
 ```
 
-`dynamic_context_scheduler.build_context_for_turn`
+`dynamic_context_scheduler.build_context_for_turn` — promotion은 `read|grep|glob`만, env kill switch (`PLANNER_PROMOTION_SHADOW_ONLY=1` default).
 
-### 5.2 목표 (v2+ — **Planned**)
+### 5.2 목표 (v2+ — **In Progress**)
 
 ```text
-IDE IN → Memory Layer → Task Layer (RuntimeState · Planner)
+IDE IN → Memory Layer → Task Layer (RuntimeState · Planner shadow · partial promotion)
     → Working Set → Prompt Pack → LLM
-    → Memory Update · Handoff · Next Decision
+    → Memory Update · Handoff · Next Decision (read-only tools only when enabled)
 ```
+
+Full planner authority (edit/shell/final)는 **Planned** — hard guard 유지.
 
 ### 5.3 v0 → v1 개선 (참고)
 
@@ -410,8 +440,9 @@ Runtime **핵심 IP만** 직접 구현한다.
 | Task Journal / Handoff | **Implemented** |
 | Coverage / Recovery policy | **Implemented** |
 | Final report renderer | **Implemented** |
-| RuntimeState / PlannerDecision contract | **In Progress** |
-| AI Planner hot path | **Planned** |
+| RuntimeState / PlannerDecision contract | **Implemented** (Phase 2.0) |
+| Planner shadow + LLM shadow + promotion gate | **Implemented** (evaluate + kill switch) |
+| AI Planner read-only hot path | **In Progress** (Phase 2.2b — default off) |
 | Memory summarization loop | **Planned** |
 | GPU Context / KV prefix policy | **Planned** (research) |
 
@@ -445,7 +476,7 @@ IDE → [이 레이어] → llama.cpp
 | 버전 | 초점 | 상태 |
 |:----:|------|------|
 | **v1** | **Local LLM Agent Runtime Middleware** — Index · WS · Journal · Evidence · Coverage | **진행 중** (핵심 Implemented) |
-| v2 | Task Planner · RuntimeState · Self Model hot path | **In Progress** (contract·shadow) |
+| v2 | Task Planner · RuntimeState · partial read-only promotion | **In Progress** (2.0–2.2b ✅, 2.2c tuning) |
 | v3 | GPU Context Policy · KV prefix reuse · multi-GPU policy | **Planned** (research) |
 | v4 | Enterprise / on-prem policy integration | **Planned** |
 
@@ -463,12 +494,13 @@ IDE → [이 레이어] → llama.cpp
 |:-:|------|------|
 | P0 | Project Index · WS · Journal · Evidence · Coverage | **Implemented** |
 | P0 | Final Report Renderer | **Implemented** |
-| P1 | RuntimeState contract | **In Progress** |
-| P1 | Planner shadow mode | **In Progress** |
-| P1 | AI Planner hot path | **Planned** |
+| P1 | RuntimeState + Planner shadow + LLM shadow | **Implemented** |
+| P1 | Promotion gate + read-only apply (kill switch) | **Implemented** (default off) |
+| P1 | Promotion metrics / intent tuning | **In Progress** (2.2c) |
+| P1 | AI Planner full authority (edit/shell/final) | **Planned** (blocked by design) |
 | P2 | Memory summarization loop | **Planned** |
 | P2 | KV / prefix policy research | **Planned** |
-| P2 | reference/ kernel 분리 | **Planned** |
+| P2 | reference/ kernel 분리 · MCP v2 | **Planned** |
 
 ---
 
@@ -481,12 +513,17 @@ Context **압축**은 부수 효과 (middleware 부가 지표):
 | Cursor proxy tokens | 103K | ~10K (−90%) |
 | Memory hierarchy ratio | — | ≤0.018 (gate) |
 | Recovery E2E | — | pass |
+| Runtime Score (30 tasks) | — | 29–30/30 (shell_logs 간헐 flaky) |
+| Promotion apply (harness) | — | eligible 5/11 · apply/eligible 100% |
 
-전체 → [BENCHMARK.md](./BENCHMARK.md)
+전체 → [BENCHMARK.md](./BENCHMARK.md) · promotion 실측 → [planner-promotion-live-validation.md](./reports/planner-promotion-live-validation.md)
 
 ```bash
 python3 scripts/benchmark-memory-hierarchy.py --quality-gate
 python3 scripts/benchmark-recovery-e2e.py
+python3 scripts/benchmark-runtime-score.py --tasks 30
+python3 scripts/test-planner-promotion-apply-e2e.py
+python3 scripts/audit-planner-promotion-metrics.py
 ```
 
 ---
@@ -499,4 +536,4 @@ python3 scripts/benchmark-recovery-e2e.py
 | [REFACTOR.md](./REFACTOR.md) | Phase · 구현 상태 |
 | [MODULE_MAP.md](./MODULE_MAP.md) | 코드 tier |
 
-*Last updated: 2026-06-22 — 현실 구현 톤 · Implemented/In Progress/Planned · middleware 포지셔닝*
+*Last updated: 2026-06-22 — Phase 2.2b read-only promotion · runtime data SSOT · repo hygiene 반영*
