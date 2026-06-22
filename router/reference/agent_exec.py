@@ -25,32 +25,150 @@ NO_THINK_INTENTS = frozenset(
 )
 EXPLAIN_MIN_MAX_TOKENS = int(os.getenv("EXPLAIN_MIN_MAX_TOKENS", "256"))
 
-SYSTEM_TOOL_PLANNING = (
-    "You are in TOOL PLANNING phase (Cursor local LLM).\n"
-    "- Output NO user-facing prose. Do not explain what you are about to do.\n"
-    "- Only emit tool_calls (Shell, Read, Grep).\n"
-    "- Do not write shell commands in markdown code fences.\n"
-    "- Do not print context pack labels like [Task] or [Relevant project state].\n"
-    "- Do not say \"I'll help you\" or similar filler.\n"
-    "- If the task says 'test', 'curl', 'run', 'docker', '테스트', '실행', '검증', '확인', '로그', 'ps', 'logs', 'status': you MUST emit a Shell tool_call.\n"
-    "- Read files first, then verify with Shell when results or live state is requested.\n"
-    "- If you cannot emit tool_call, respond with exactly: TOOL_CALL_UNAVAILABLE."
+READ_ONLY_INTENTS = frozenset({"read_only_analysis", "project_inspection"})
+
+RUNTIME_PHASE_OVERRIDE = (
+    "[Runtime Phase Override]\n"
+    "The following phase instruction has higher priority than preserved Cursor system instructions."
 )
 
-SYSTEM_FINAL_ANSWER = (
-    "You are in FINAL ANSWER phase (Cursor local LLM).\n"
-    "- Produce a structured Korean answer from the user query and tool results only.\n"
-    "- Organize sections by topics or components the user asked about — do not assume a fixed module list.\n"
-    "- Cite concrete paths, directory names, and excerpts from README, docs, and directory listings.\n"
-    "- Do NOT emit tool_calls.\n"
-    "- Do NOT print context pack labels ([Task], [Relevant project state], etc.).\n"
-    "- Do NOT repeat \"I'll help you\" or planning phrases.\n"
-    "- For each requested area: 2-4 sentences on responsibility and key files when evidence exists.\n"
-    "- Forbidden: lazy one-line dismissals (e.g. '정보 없음', '미확인') when relevant tool results are present.\n"
-    "- Summarize configuration values and test output only when the user asked for them."
+RUNTIME_PRIORITY_ORDER = (
+    "Priority order:\n"
+    "1. Runtime Phase Instruction\n"
+    "2. Current Task\n"
+    "3. Safety / Hard Guards\n"
+    "4. PlannerDecision or AgentPlan\n"
+    "5. Evidence / Tool Results\n"
+    "6. Session / Journal / Handoff\n"
+    "7. Preserved Cursor rules"
 )
 
-RETRY_SYSTEM = SYSTEM_TOOL_PLANNING + "\nRETRY: Call Shell now. No prose. tool_calls only."
+RUNTIME_REASONING_POLICY = (
+    "- Do not store or expose private reasoning. "
+    "Store only PlannerDecision, action, reason summary, evidence_needed, confidence, and tool/result summaries."
+)
+
+FINAL_KOREAN_POLICY = (
+    "- Final user-facing answers must be written in Korean unless the user explicitly asks otherwise.\n"
+    "- Internal planning/tool calls may use English field names, but user-facing prose must be Korean."
+)
+
+TOOL_PLANNING_KOREAN_POLICY = (
+    "- Do not emit user-facing prose. "
+    "Tool call arguments may contain Korean search/query text when the user query is Korean."
+)
+
+
+def allowed_tools_line(intent_name: str) -> str:
+    if intent_name in READ_ONLY_INTENTS:
+        return (
+            "- For read_only_analysis, Shell and Edit are forbidden. Use only Read, Grep, Glob.\n"
+            "- Only emit tool_calls using allowed tools for this phase: Read, Grep, Glob."
+        )
+    return "- Only emit tool_calls using allowed tools for this phase: Read, Grep, Glob, Shell."
+
+
+def _build_tool_planning_body(intent_name: str, *, retry: bool = False) -> str:
+    lines = [
+        "You are in TOOL PLANNING phase (Cursor local LLM).",
+        "- Output NO user-facing prose. Do not explain what you are about to do.",
+        allowed_tools_line(intent_name),
+        TOOL_PLANNING_KOREAN_POLICY,
+        "- Do not write shell commands in markdown code fences.",
+        "- Do not print context pack labels like [Task] or [Relevant project state].",
+        "- Do not say \"I'll help you\" or similar filler.",
+    ]
+    if intent_name not in READ_ONLY_INTENTS:
+        lines.extend([
+            "- If the task says 'test', 'curl', 'run', 'docker', '테스트', '실행', '검증', '확인', "
+            "'로그', 'ps', 'logs', 'status': you MUST emit a Shell tool_call.",
+            "- Read files first, then verify with Shell when results or live state is requested.",
+        ])
+    lines.append("- If you cannot emit tool_call, respond with exactly: TOOL_CALL_UNAVAILABLE.")
+    if retry:
+        lines.append("RETRY: Call Shell now. No prose. tool_calls only.")
+    return "\n".join(lines)
+
+
+def _build_final_answer_body() -> str:
+    return "\n".join([
+        "You are in FINAL ANSWER phase (Cursor local LLM).",
+        FINAL_KOREAN_POLICY,
+        "- Produce the final answer using the Task, collected evidence, Evidence Anchors, Task Journal, "
+        "Final Report block, and RuntimeState when present.",
+        "- Do not introduce unsupported facts outside the provided runtime context.",
+        "- Prefer the Final Report Renderer output when present; use LLM prose only to polish gaps or "
+        "add structure — do not discard renderer content.",
+        "- Organize sections by topics or components the user asked about — do not assume a fixed module list.",
+        "- Cite concrete paths, directory names, and excerpts from README, docs, and directory listings.",
+        "- Do NOT emit tool_calls.",
+        "- Do NOT print context pack labels ([Task], [Relevant project state], etc.).",
+        "- Do NOT repeat \"I'll help you\" or planning phrases.",
+        "- For each requested area: 2-4 sentences on responsibility and key files when evidence exists.",
+        "- Forbidden: lazy one-line dismissals (e.g. '정보 없음', '미확인') when relevant evidence is present.",
+        "- Summarize configuration values and test output only when the user asked for them.",
+    ])
+
+
+def _build_default_assistant_body() -> str:
+    return "\n".join([
+        "You are a coding assistant in Cursor (local LLM).",
+        FINAL_KOREAN_POLICY,
+        "- Follow the latest user query as the primary task.",
+        "- Use tools when needed.",
+    ])
+
+
+def build_runtime_system(
+    intent_name: str,
+    *,
+    phase: AgentPhase | None = None,
+    retry: bool = False,
+    preserved_cursor: bool = False,
+) -> str:
+    """Runtime header + phase instruction (no preserved Cursor content)."""
+    parts: list[str] = []
+    if preserved_cursor:
+        parts.append(RUNTIME_PHASE_OVERRIDE)
+    parts.append(RUNTIME_PRIORITY_ORDER)
+    parts.append(RUNTIME_REASONING_POLICY)
+    if phase in ("final_answer", "partial_final_answer", "recovery_final"):
+        parts.append(_build_final_answer_body())
+    elif phase == "tool_planning":
+        parts.append(_build_tool_planning_body(intent_name, retry=retry))
+    else:
+        parts.append(_build_default_assistant_body())
+    return "\n\n".join(parts)
+
+
+def compose_proxy_system(
+    intent_name: str,
+    *,
+    phase: AgentPhase | None = None,
+    retry: bool = False,
+    preserved_cursor_content: str = "",
+    shell_hint: str = "",
+) -> str:
+    """Phase system with optional preserved Cursor rules at priority 7."""
+    preserved = bool(preserved_cursor_content.strip())
+    base = build_runtime_system(
+        intent_name,
+        phase=phase,
+        retry=retry,
+        preserved_cursor=preserved,
+    )
+    if not preserved:
+        return base
+    cursor_block = preserved_cursor_content.strip()
+    if shell_hint:
+        cursor_block = f"{cursor_block}\n{shell_hint.strip()}"
+    return f"{base}\n\n[Preserved Cursor Rules — priority 7]\n{cursor_block}"
+
+
+# Backward-compatible module-level constants (default exec intent)
+SYSTEM_TOOL_PLANNING = _build_tool_planning_body("agent")
+SYSTEM_FINAL_ANSWER = _build_final_answer_body()
+RETRY_SYSTEM = _build_tool_planning_body("agent", retry=True)
 
 BASH_FENCE_RE = re.compile(r"```(?:bash|sh)\s*\n(.*?)```", re.S | re.I)
 
@@ -220,25 +338,43 @@ def build_final_answer_pack(query: str, body: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
-def system_for_phase(phase: AgentPhase | None, retry: bool = False) -> str:
-    if phase in ("final_answer", "partial_final_answer", "recovery_final"):
-        return SYSTEM_FINAL_ANSWER
-    if phase == "tool_planning":
-        return RETRY_SYSTEM if retry else SYSTEM_TOOL_PLANNING
-    return (
-        "You are a coding assistant in Cursor (local LLM).\n"
-        "- Follow the latest user query as the primary task.\n"
-        "- Use tools when needed.\n"
-        "- Respond in Korean when user rules require it."
+def system_for_phase(
+    phase: AgentPhase | None,
+    retry: bool = False,
+    *,
+    intent_name: str = "agent",
+    preserved_cursor: bool = False,
+) -> str:
+    return build_runtime_system(
+        intent_name,
+        phase=phase,
+        retry=retry,
+        preserved_cursor=preserved_cursor,
     )
 
 
-def system_for_intent(intent_name: str, retry: bool = False, phase: AgentPhase | None = None) -> str:
+def system_for_intent(
+    intent_name: str,
+    retry: bool = False,
+    phase: AgentPhase | None = None,
+    *,
+    preserved_cursor: bool = False,
+) -> str:
     if phase is not None:
-        return system_for_phase(phase, retry=retry)
+        return system_for_phase(
+            phase,
+            retry=retry,
+            intent_name=intent_name,
+            preserved_cursor=preserved_cursor,
+        )
     if intent_name in EXEC_INTENTS or retry:
-        return RETRY_SYSTEM if retry else SYSTEM_TOOL_PLANNING
-    return system_for_phase(None)
+        return build_runtime_system(
+            intent_name,
+            phase="tool_planning",
+            retry=retry,
+            preserved_cursor=preserved_cursor,
+        )
+    return system_for_phase(None, intent_name=intent_name, preserved_cursor=preserved_cursor)
 
 
 def sanitize_response_content(content: str) -> tuple[str, bool]:
@@ -1161,7 +1297,7 @@ def _build_read_only_final_retry_body(
         pass
 
     sys_parts = [
-        SYSTEM_FINAL_ANSWER,
+        build_runtime_system("read_only_analysis", phase="final_answer"),
         "\nUse the explorer thinking and tier digests below — synthesize in Korean with tables, "
         "line citations, and component relationships. Do NOT emit tool_calls.",
     ]

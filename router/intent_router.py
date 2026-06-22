@@ -15,6 +15,7 @@ from reference.agent_exec import (
     apply_model_request_opts,
     apply_stream_policy,
     build_final_answer_pack,
+    compose_proxy_system,
     detect_agent_phase,
     exclude_stale_refs,
     is_exec_intent,
@@ -809,19 +810,25 @@ def build_proxy_body(
 
     if intent.intent in EXEC_CONTEXT_INTENTS:
         original_system = extract_original_system(body)
+        shell_hint = ""
+        if original_system and intent.needs_shell:
+            shell_hint = (
+                "\n\n[Execution requirement] This task requires real shell execution. "
+                "You MUST call the Shell tool for any 'curl', 'run', 'docker', '실행', '테스트', '검증', '확인', '로그', 'ps', 'logs' steps. "
+                "Do NOT invent or assume command outputs — call Shell and use the real result."
+            )
         if original_system:
-            # Append shell execution hint when task requires it — do not replace Cursor's system
-            if intent.needs_shell:
-                orig_content = _content_text(original_system.get("content", ""))
-                shell_hint = (
-                    "\n\n[Execution requirement] This task requires real shell execution. "
-                    "You MUST call the Shell tool for any 'curl', 'run', 'docker', '실행', '테스트', '검증', '확인', '로그', 'ps', 'logs' steps. "
-                    "Do NOT invent or assume command outputs — call Shell and use the real result."
-                )
-                original_system = {"role": "system", "content": orig_content + shell_hint}
-            proxy_messages.append(original_system)
+            orig_content = _content_text(original_system.get("content", ""))
+            proxy_messages.append({
+                "role": "system",
+                "content": compose_proxy_system(
+                    intent.intent,
+                    phase=phase or "tool_planning",
+                    preserved_cursor_content=orig_content,
+                    shell_hint=shell_hint,
+                ),
+            })
         else:
-            # No Cursor-provided system → inject tool_planning instructions as fallback
             proxy_messages.append({
                 "role": "system",
                 "content": system_for_intent(intent.intent, phase="tool_planning"),

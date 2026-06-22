@@ -520,6 +520,229 @@ def format_flow_event(row: dict[str, Any]) -> str | None:
     return "\n".join(lines) if len(lines) > 1 else None
 
 
+def should_emit_live_event(row: dict[str, Any], *, last_key: str = "") -> tuple[bool, str]:
+    """Filter noisy trace rows in live viewer mode. Returns (emit, dedupe_key)."""
+    event = str(row.get("event") or "")
+    if event == "action_emit":
+        return False, last_key
+    if event == "planner.shadow.compared":
+        if row.get("match") is True and not row.get("would_change_hot_path"):
+            return False, last_key
+    if event in ("planner.promotion.blocked", "planner.promotion.eligible", "planner.promotion.skipped"):
+        key = "|".join([
+            event,
+            str(row.get("flow_id") or ""),
+            str(row.get("reason") or "")[:80],
+        ])
+        if key == last_key:
+            return False, last_key
+        return True, key
+    if event == "planner.promotion.evaluated" and not row.get("eligible"):
+        # evaluated+blocked often duplicate — keep evaluated only
+        pass
+    return True, last_key
+
+
+def format_live_summary(row: dict[str, Any]) -> str | None:
+    """Cursor-like compact live transcript — thinking, tools, results, phase."""
+    event = str(row.get("event") or "")
+    if not event:
+        return None
+
+    ts = _short_ts(str(row.get("ts") or ""))
+    phase = str(row.get("phase") or "")
+    query = str(row.get("query") or "").strip()
+    lines: list[str] = []
+
+    def header(icon: str, title: str) -> None:
+        phase_bit = f" · {phase}" if phase else ""
+        lines.append(f"[{ts}] {icon} {title}{phase_bit}")
+
+    if event == "planner.runtime_state.created":
+        header("🔄", "턴 시작")
+        summary = str(row.get("result_summary") or row.get("runtime_state_summary") or "")
+        if summary:
+            lines.append(f"  {summary}")
+        if query:
+            lines.append(f"  질문: {query[:120]}")
+        return "\n".join(lines)
+
+    if event == "plan":
+        step = row.get("step", "?")
+        source = str(row.get("decision_source") or "planner")
+        header("💭", f"생각 · step {step} ({source})")
+        thinking = str(row.get("thinking") or "").strip()
+        if thinking:
+            lines.extend(_indent_block(thinking, prefix="  ", max_lines=12))
+        next_tool = str(row.get("next_tool") or row.get("tool_name") or "")
+        if next_tool == "answer" or row.get("depth_ok"):
+            lines.append("  → 최종 답변 작성")
+        elif next_tool:
+            cmd = _action_command(
+                next_tool,
+                str(row.get("next_sid") or row.get("source_id") or ""),
+                str(row.get("next_pattern") or row.get("pattern") or ""),
+                str(row.get("next_glob") or row.get("glob_pattern") or ""),
+            )
+            lines.append(f"  → 다음: {cmd}")
+        pending = row.get("checklist_pending") or []
+        if pending:
+            lines.append(f"  남은 수집: {', '.join(str(x) for x in pending[:4])}")
+        return "\n".join(lines)
+
+    if event == "planner.llm.proposed":
+        action = str(row.get("decision") or row.get("action") or "")
+        header("🧠", f"LLM Planner · {action}")
+        reason = str(row.get("reason") or "").strip()
+        if reason:
+            lines.append(f"  {reason[:280]}")
+        targets = row.get("target_files")
+        if targets:
+            lines.append(f"  대상: {targets}")
+        return "\n".join(lines)
+
+    if event == "planner.shadow.proposed":
+        action = str(row.get("decision") or row.get("action") or "")
+        header("📋", f"Rule Planner · {action}")
+        reason = str(row.get("reason") or "").strip()
+        if reason:
+            lines.append(f"  {reason[:200]}")
+        return "\n".join(lines)
+
+    if event == "planner.shadow.compared":
+        action = str(row.get("decision") or row.get("action") or "")
+        match = row.get("match")
+        header("⚖️", f"Planner 비교 · shadow={action}")
+        if match is not None:
+            lines.append(f"  rule 일치: {match}")
+        mismatch = row.get("mismatch_reason") or row.get("mismatch_reasons")
+        if mismatch:
+            lines.append(f"  차이: {mismatch}")
+        if row.get("would_change_hot_path"):
+            lines.append("  ⚠ hot path 변경 가능")
+        return "\n".join(lines)
+
+    if event == "planner.triple_compared":
+        header(
+            "⚖️",
+            f"3-way · rule={row.get('rule_action')} heuristic={row.get('heuristic_action')} llm={row.get('llm_action')}",
+        )
+        if row.get("would_change_hot_path"):
+            lines.append("  ⚠ hot path 변경 가능")
+        return "\n".join(lines)
+
+    if event.startswith("planner.promotion."):
+        label = event.rsplit(".", 1)[-1]
+        action = str(row.get("allowed_action") or row.get("effective_action") or "none")
+        header("🛡", f"Promotion · {label} · {action}")
+        reason = str(row.get("reason") or "").strip()
+        if reason:
+            lines.append(f"  {reason[:240]}")
+        dry = row.get("dry_run_tool_call") or {}
+        fn = (dry.get("function") or {}) if isinstance(dry, dict) else {}
+        if fn.get("name"):
+            lines.append(f"  (dry-run {fn.get('name')})")
+        return "\n".join(lines)
+
+    if event == "working_set.created":
+        header("📦", "컨텍스트 팩")
+        summary = str(row.get("result_summary") or "")
+        if summary:
+            lines.append(f"  {summary}")
+        targets = row.get("priority_targets") or []
+        if targets:
+            lines.append(f"  우선 파일: {', '.join(str(t) for t in targets[:6])}")
+        return "\n".join(lines)
+
+    if event == "coverage.checked":
+        header("📊", "커버리지")
+        summary = str(row.get("result_summary") or "")
+        if summary:
+            lines.append(f"  {summary}")
+        missing = row.get("missing") or []
+        if missing:
+            lines.append(f"  부족: {', '.join(str(m) for m in missing[:5])}")
+        return "\n".join(lines)
+
+    if event in ("tool.requested", "action_emit"):
+        cmd = _action_command(
+            str(row.get("tool_name") or row.get("tool") or ""),
+            str(row.get("source_id") or row.get("path") or ""),
+            str(row.get("pattern") or ""),
+            str(row.get("glob_pattern") or ""),
+            tool_args=row.get("tool_args") if isinstance(row.get("tool_args"), dict) else {},
+        )
+        header("🔧", f"도구 실행 · {cmd}")
+        return "\n".join(lines)
+
+    if event in ("tool.completed", "action_done"):
+        cmd = _action_command(
+            str(row.get("tool_name") or row.get("tool") or ""),
+            str(row.get("source_id") or row.get("path") or ""),
+            str(row.get("pattern") or ""),
+            str(row.get("glob_pattern") or ""),
+            tool_args=row.get("tool_args") if isinstance(row.get("tool_args"), dict) else {},
+        )
+        chars = int(row.get("result_chars") or 0)
+        meta = f" ({chars:,} chars)" if chars else ""
+        header("✅", f"도구 완료 · {cmd}{meta}")
+        preview = str(row.get("result_preview") or row.get("result_summary") or "").strip()
+        if preview:
+            lines.extend(_preview_lines(preview, max_lines=8))
+        return "\n".join(lines)
+
+    if event in ("action_failed", "action_blocked"):
+        cmd = _action_command(
+            str(row.get("tool") or row.get("tool_name") or ""),
+            str(row.get("source_id") or ""),
+        )
+        status = "실패" if event == "action_failed" else "차단"
+        header("❌", f"도구 {status} · {cmd}")
+        guard = str(row.get("guard_reason") or "").strip()
+        if guard:
+            lines.append(f"  {guard[:200]}")
+        return "\n".join(lines)
+
+    if event == "memory.journal.appended":
+        target = str(row.get("path") or row.get("target") or row.get("tool_name") or "")
+        header("📝", f"Journal · {target}")
+        summary = str(row.get("result_summary") or "").strip()
+        if summary:
+            lines.append(f"  {summary[:200]}")
+        return "\n".join(lines)
+
+    if event == "memory.evidence.upserted":
+        target = str(row.get("path") or row.get("target") or "")
+        header("💾", f"Evidence · {target}")
+        summary = str(row.get("result_summary") or "").strip()
+        if summary:
+            lines.append(f"  {summary[:200]}")
+        return "\n".join(lines)
+
+    if event == "final_report.rendered":
+        header("📄", "최종 리포트")
+        summary = str(row.get("result_summary") or "")
+        if summary:
+            lines.append(f"  {summary}")
+        return "\n".join(lines)
+
+    if event in ("final_promote", "final_synthesis"):
+        header("✨", "최종 답변")
+        thinking = str(row.get("thinking") or "").strip()
+        if thinking:
+            lines.extend(_indent_block(thinking, prefix="  ", max_lines=10))
+        return "\n".join(lines)
+
+    # Fallback: shorter than verbose format
+    header("·", event.replace(".", " › "))
+    for key in ("reason", "result_summary", "decision"):
+        val = str(row.get(key) or "").strip()
+        if val:
+            lines.append(f"  {val[:200]}")
+            break
+    return "\n".join(lines) if len(lines) > 1 else None
+
+
 def _emit_flow(row: dict[str, Any]) -> None:
     global _last_plan_key
     if not EXPLORER_TRACE_STDOUT:
@@ -732,3 +955,172 @@ def replay_trace_file(
             if block:
                 blocks.append(block)
     return blocks
+
+
+# --- Flow graph / sequence verification (CLI + E2E tests) ---
+
+FLOW_STAGES: list[tuple[str, tuple[str, ...]]] = [
+    ("User Query", ()),
+    (
+        "RuntimeState",
+        ("planner.runtime_state.created",),
+    ),
+    (
+        "Planner",
+        (
+            "planner.shadow.proposed",
+            "planner.shadow.compared",
+            "planner.llm.proposed",
+            "planner.triple_compared",
+            "plan",
+        ),
+    ),
+    (
+        "Promotion",
+        (
+            "planner.promotion.evaluated",
+            "planner.promotion.eligible",
+            "planner.promotion.blocked",
+            "planner.promotion.applied",
+            "planner.promotion.skipped",
+        ),
+    ),
+    ("Working Set", ("working_set.created",)),
+    (
+        "Read/Tool",
+        (
+            "tool.requested",
+            "tool.completed",
+            "action_emit",
+            "action_done",
+            "action_failed",
+            "action_blocked",
+        ),
+    ),
+    ("Evidence", ("memory.evidence.upserted",)),
+    ("Journal", ("memory.journal.appended",)),
+    ("Coverage", ("coverage.checked",)),
+    (
+        "Final Report",
+        ("final_report.rendered", "final_synthesis", "final_promote"),
+    ),
+]
+
+CANONICAL_RUNTIME_FLOW_REQUIRED: tuple[str, ...] = (
+    "planner.runtime_state.created",
+    "planner.shadow.proposed",
+    "planner.shadow.compared",
+    "working_set.created",
+    "coverage.checked",
+    "memory.journal.appended",
+)
+
+
+def load_trace_rows(path: Path | str, *, flow_id: str = "") -> list[dict[str, Any]]:
+    """Load NDJSON trace rows (optionally filtered by flow_id)."""
+    p = Path(path)
+    if not p.is_file():
+        return []
+    rows: list[dict[str, Any]] = []
+    with p.open(encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(row, dict):
+                continue
+            if flow_id and str(row.get("flow_id") or row.get("req_id") or "") != flow_id:
+                continue
+            rows.append(row)
+    return rows
+
+
+def trace_event_names(rows: list[dict[str, Any]]) -> list[str]:
+    return [str(r.get("event") or "") for r in rows if r.get("event")]
+
+
+def verify_flow_subsequence(
+    events: list[str],
+    required: tuple[str, ...] | list[str] = CANONICAL_RUNTIME_FLOW_REQUIRED,
+) -> tuple[bool, str]:
+    """Return (ok, message) — required events must appear in order."""
+    req = list(required)
+    pos = 0
+    for name in req:
+        found = False
+        while pos < len(events):
+            if events[pos] == name:
+                found = True
+                pos += 1
+                break
+            pos += 1
+        if not found:
+            return False, f"missing or out-of-order event: {name}"
+    return True, "ok"
+
+
+def _stage_hits(rows: list[dict[str, Any]]) -> list[tuple[str, bool, list[str]]]:
+    events = trace_event_names(rows)
+    has_query = any(str(r.get("query") or "").strip() for r in rows)
+    out: list[tuple[str, bool, list[str]]] = []
+    for stage_name, stage_events in FLOW_STAGES:
+        if stage_name == "User Query":
+            hits = ["query present"] if has_query else []
+            out.append((stage_name, bool(hits), hits))
+            continue
+        matched = [ev for ev in stage_events if ev in events]
+        out.append((stage_name, bool(matched), matched))
+    return out
+
+
+def build_flow_graph(
+    path: Path | str | None = None,
+    *,
+    rows: list[dict[str, Any]] | None = None,
+    flow_id: str = "",
+) -> str:
+    """Render ASCII pipeline graph from trace file or preloaded rows."""
+    if rows is None:
+        if path is None:
+            return "(no trace data)"
+        rows = load_trace_rows(path, flow_id=flow_id)
+    if not rows:
+        return "(empty trace — run EXPLORER_TRACE_ENABLED=1 and run a router turn)"
+
+    fid = flow_id or str(rows[-1].get("flow_id") or rows[-1].get("req_id") or "")
+    header = "Explorer Runtime Flow"
+    if fid:
+        header += f" (flow_id={fid[:24]}{'…' if len(fid) > 24 else ''})"
+    lines = [header, "=" * max(40, len(header)), ""]
+
+    stages = _stage_hits(rows)
+    for i, (name, hit, matched) in enumerate(stages):
+        mark = "✓" if hit else " "
+        detail = ""
+        if matched and name != "User Query":
+            shown = matched[:3]
+            extra = len(matched) - len(shown)
+            detail = ", ".join(shown)
+            if extra > 0:
+                detail += f" (+{extra})"
+        elif name == "User Query" and hit:
+            detail = matched[0] if matched else ""
+        line = f"[{mark}] {name}"
+        if detail:
+            line += f"  — {detail}"
+        lines.append(line)
+        if i < len(stages) - 1:
+            lines.append(" │")
+            lines.append(" ▼")
+
+    events = trace_event_names(rows)
+    ok, msg = verify_flow_subsequence(events)
+    lines.append("")
+    lines.append(f"Sequence check: {'PASS' if ok else 'FAIL'} — {msg}")
+    if not ok:
+        lines.append(f"Events seen: {' → '.join(events[:24])}{' …' if len(events) > 24 else ''}")
+    return "\n".join(lines)

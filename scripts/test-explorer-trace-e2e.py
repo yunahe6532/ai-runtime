@@ -16,9 +16,11 @@ sys.path.insert(0, str(ROOT / "router"))
 
 from agent_brain.planner_shadow import run_planner_shadow  # noqa: E402
 from explorer_trace import (  # noqa: E402
+    build_flow_graph,
     diagnose_trace_file,
     format_flow_event,
     replay_trace_file,
+    verify_flow_subsequence,
     write_explorer_trace,
 )
 from legacy.memory_store import SessionState  # noqa: E402
@@ -129,6 +131,7 @@ def test_tail_explorer_from_start_exits(tmp: Path) -> None:
             str(ROOT / "scripts/tail-explorer-flow.py"),
             str(trace),
             "--from-start",
+            "--no-follow",
         ],
         capture_output=True,
         text=True,
@@ -157,6 +160,28 @@ def test_format_new_event_types() -> None:
     print("PASS test_format_new_event_types")
 
 
+def test_flow_graph_builder(tmp: Path) -> None:
+    trace = tmp / "graph.ndjson"
+    os.environ["EXPLORER_TRACE_PATH"] = str(trace)
+    os.environ["EXPLORER_TRACE_STDOUT"] = "0"
+    for ev in (
+        "planner.runtime_state.created",
+        "planner.shadow.proposed",
+        "planner.shadow.compared",
+        "working_set.created",
+        "coverage.checked",
+        "memory.journal.appended",
+    ):
+        write_explorer_trace(ev, query="graph test", result_summary=ev)
+    rows = __import__("explorer_trace").load_trace_rows(trace)
+    ok, msg = verify_flow_subsequence(__import__("explorer_trace").trace_event_names(rows))
+    assert ok, msg
+    graph = build_flow_graph(rows=rows)
+    assert "[✓] RuntimeState" in graph
+    assert "Sequence check: PASS" in graph
+    print("PASS test_flow_graph_builder")
+
+
 def main() -> int:
     os.environ["EXPLORER_TRACE_ENABLED"] = "1"
     os.environ["EXPLORER_TRACE_STDOUT"] = "0"
@@ -167,6 +192,7 @@ def main() -> int:
         test_malformed_line_ignored(tmp)
         test_missing_file_diagnosis(tmp)
         test_tail_explorer_from_start_exits(tmp)
+        test_flow_graph_builder(tmp)
     test_format_new_event_types()
     print("\nAll explorer trace E2E tests passed.")
     return 0

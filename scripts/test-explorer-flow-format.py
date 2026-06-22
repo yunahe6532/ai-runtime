@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "router"))
 
-from explorer_trace import format_flow_event  # noqa: E402
+from explorer_trace import format_flow_event, format_live_summary  # noqa: E402
 
 
 def test_plan_shows_thinking_and_next_tool() -> None:
@@ -95,10 +95,41 @@ def test_alternating_sequence_readable() -> None:
     assert transcript.index("done · Glob") < transcript.index("Now grep imports")
 
 
+def test_live_summary_plan_and_tool() -> None:
+    plan = {
+        "ts": "2026-06-22T03:00:00+00:00",
+        "event": "plan",
+        "phase": "tool_planning",
+        "step": 0,
+        "decision_source": "llm",
+        "thinking": "router/main.py부터 구조를 파악한다.",
+        "next_tool": "Read",
+        "next_sid": "router/main.py",
+    }
+    out = format_live_summary(plan) or ""
+    assert "💭" in out
+    assert "router/main.py" in out
+    assert "구조" in out
+
+    done = {
+        "ts": "2026-06-22T03:00:01+00:00",
+        "event": "action_done",
+        "tool": "Read",
+        "source_id": "router/main.py",
+        "success": True,
+        "result_chars": 120,
+        "result_preview": "def main():",
+    }
+    out2 = format_live_summary(done) or ""
+    assert "✅" in out2
+    assert "def main()" in out2
+
+
 def main() -> int:
     test_plan_shows_thinking_and_next_tool()
     test_action_done_shows_result_preview()
     test_alternating_sequence_readable()
+    test_live_summary_plan_and_tool()
     print("OK: explorer flow format tests passed")
     return 0
 

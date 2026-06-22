@@ -13,6 +13,7 @@ from reference.agent_exec import (
     EXEC_INTENTS,
     apply_stream_policy,
     system_for_intent,
+    compose_proxy_system,
 )
 from capture import _content_text, _sha256
 from context_budget import (
@@ -115,13 +116,21 @@ def _extract_user_query_text(body: dict[str, Any], query: str = "") -> str:
 
 
 def _compact_system(body: dict[str, Any], intent_name: str, phase: str, budget_tokens: int) -> str:
-    base = system_for_intent(intent_name, phase=phase)
     original = extract_original_system(body)
+    preserved = ""
     if original:
         orig_text = _content_text(original.get("content", ""))
         rules_m = re.search(r"<user_rules>.*?</user_rules>", orig_text, re.S)
-        if rules_m:
-            base += "\n\n" + rules_m.group(0)
+        preserved = rules_m.group(0) if rules_m else orig_text
+    phase_val = phase or None
+    if preserved:
+        base = compose_proxy_system(
+            intent_name,
+            phase=phase_val,  # type: ignore[arg-type]
+            preserved_cursor_content=preserved,
+        )
+    else:
+        base = system_for_intent(intent_name, phase=phase_val)  # type: ignore[arg-type]
     return truncate_to_token_budget(base, budget_tokens)
 
 
